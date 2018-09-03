@@ -149,7 +149,13 @@ class Game {
         this.gameState = state;
     }
     
+    createGameboard() {
+        log('Creating gameboard...');
+        this.gameBoard = new Gameboard(this.players.length);
+    }
+    
     createMemberships() {
+        log('Creating membership decks...');
         let numOfFacists = 2;
         if (this.players.length > 6 && this.players.length < 9) {
             numOfFacists = 3;
@@ -179,6 +185,7 @@ class Game {
     }
     
     createDeck() {
+        log('Creating policy deck...');
         for (var i = 0; i < FacistPolicies; i++) {
             this.deck.push('F');
         }
@@ -208,7 +215,7 @@ class Game {
     }
     
     assignMemberships() {
-        this.sendMessageLine('Dealing party/role cards...');
+        log('Assigning memberships...');
         
         for(var i = 0; i < this.players.length; i++) {
             this.players[i].assignMembership(this.membershipDeck.pop());
@@ -233,14 +240,15 @@ class Game {
             player.user.send(player.getFullMembershipInfo(this.hitler, this.facists, this.doesHitlerKnowFacists));
         }        
         
-        this.sendMessageLine('Please check your DM for your party and role assignement!\n');
+        this.sendMessageLine('Dealing party/role cards...\nPlease check your DM for your party and role assignement!\n');
     }
     
-    assignRandomPresident() {
-        if (!this.checkStates(Game.GameStates.AssignPresident)) return;
+    assignRandomPresident() {        
+        log('Assigning random president...');
+        if (!this.checkState(Game.GameStates.AssignPresident)) return;
         
         this.presidentIndex = getRandomInt(this.players.length);
-        this.president = this.players[this.president];
+        this.president = this.players[this.presidentIndex];
         this.channcelorIndex = null;
         this.chancellor =  null;
         
@@ -248,42 +256,60 @@ class Game {
         this.setState(Game.GameStates.NominateChancellor);
     }
     
-    assignNextPresident() {
-        if (!this.checkStates(Game.GameStates.AssignPresident)) return;
+    assignNextPresident(player) {
+        log('Assigning president...');
+        if (!this.checkState(Game.GameStates.AssignPresident)) return;
+        let notice = '';
         
         if (this.previousPresidentIndex && this.speciallyElectedPresident) {
-            this.sendMessageLine(`Returning to previous president order prior to the Special Election...`);
+            notice += `Returning to previous president order prior to the Special Election...\n`;
             this.presidentIndex = this.previousPresidentIndex;
             this.previousPresidentIndex = null;
             this.speciallyElectedPresident = false;
         }
         
-        this.presidentIndex = (this.presidentIndex + 1) % this.players.length;
-        
-        while(this.players[this.presidentIndex].isDead) {
-            this.presidentIndex = (this.presidentIndex + 1) % this.players.length;
-        }
+        this.previousGovernment = [];
+        this.previousGovernment.push(this.president.id);
+        this.previousGovernment.push(this.chancellor.id);
         
         this.president.resetAllowances();
         this.chancellor.resetAllowances();
         
-        this.president = this.players[this.presidentIndex];
         this.channcelorIndex = null;
         this.chancellor = null;
         this.chancellorRequestedVeto = false;
         
-        this.sendMessageLine(`${this.president.nickname} is now the President`);
+        if (player) { // specially elected
+            this.speciallyElectedPresident = true;
+            this.previousPresidentIndex = this.presidentIndex;
+            this.president = player;
+        } else { 
+            this.presidentIndex = (this.presidentIndex + 1) % this.players.length;
+            
+            while(this.players[this.presidentIndex].isDead) {
+                this.presidentIndex = (this.presidentIndex + 1) % this.players.length;
+            }
+        
+            this.president = this.players[this.presidentIndex];
+        }        
+        
+        notice += `${this.president.nickname} is now the President`;
+        this.sendMessageLine(notice);
         this.setState(Game.GameStates.NominateChancellor);
     }
     
     nominateChancellor(author, nominated) {
-        if (!this.checkStates(Game.GameStates.NominateChancellor)) return;
+        if (!this.checkState(Game.GameStates.NominateChancellor)) return;
         
         if (author.id === this.president.id) {
             const player = this.findPlayer(nominated.id);
+            const wasInPrevGovt = this.previousGovernment.find(id => id === player.id);
             
             if (player.isDead) {
                 this.sendMessageLine(`${player.nickname} is dead and cannot be nominated as Chancellor`);
+                return;
+            } else if (wasInPrevGovt) {
+                this.sendMessageLine(`${player.nickname} was part of the previous government and cannot be nominated as Chancellor`);
                 return;
             }
             
@@ -294,7 +320,7 @@ class Game {
     }
 
     voteOnNomination(author, vote) {
-        if (!this.checkStates(Game.GameStates.VoteOnNomination)) return;
+        if (!this.checkState(Game.GameStates.VoteOnNomination)) return;
         
         vote = vote.toLowerCase();        
         const player = this.findPlayer(author.id);
@@ -371,7 +397,7 @@ class Game {
     }
     
     drawPolicies(author) {
-        if (!this.checkStates(Game.GameStates.PresidentDrawPolicies)) return;
+        if (!this.checkState(Game.GameStates.PresidentDrawPolicies)) return;
         
         const player = this.findPlayer(author.id);
         
@@ -389,7 +415,7 @@ class Game {
     discardPolicy(author, policy) {        
         const player = this.findPlayer(author.id);
         
-        if (!this.checkState(Game.GameStates.PresidentDiscardPolicy) && !this.checkStates(Game.GameStates.ChancellorDiscardPolicy)) return;
+        if (!this.checkState(Game.GameStates.PresidentDiscardPolicy) && !this.checkState(Game.GameStates.ChancellorDiscardPolicy)) return;
         if (this.checkState(Game.GameStates.PresidentDiscardPolicy) && player.id !== this.president.id) return;
         if (this.checkState(Game.GameStates.ChancellorDiscardPolicy) && player.id !== this.chancellor.id) return;
         
@@ -405,7 +431,7 @@ class Game {
             if (this.drawnPolicies.length > 1) {
                 log('More than one policy left after Chancellor discarded');
                 log(this.drawnPolicies);
-            } else if (this.drawnPolicies.length === ) {
+            } else if (this.drawnPolicies.length === 0) {
                 log('No policies left after chancellor discarded!');
             }
             
@@ -506,7 +532,7 @@ class Game {
     }
     
     investigatePlayer(author, user) {
-        if (!this.checkStates(Game.GameStates.PresidentInvestigatePlayer)) return;
+        if (!this.checkState(Game.GameStates.PresidentInvestigatePlayer)) return;
         
         if (author.id === this.president.id) {
             const player = this.findPlayer(user.id);
@@ -533,7 +559,7 @@ class Game {
     }
     
     speciallyElectPresident(author, newPres) {
-        if (!this.checkStates(Game.GameStates.SpeciallyElectPresident)) return;
+        if (!this.checkState(Game.GameStates.SpeciallyElectPresident)) return;
         
         if (author.id === this.president.id) {
             const player = this.findPlayer(newPres.id);
@@ -543,19 +569,8 @@ class Game {
                 return;
             }
             
-            this.president.resetAllowances();
-            this.chancellor.resetAllowances();
-        
-            this.president = player;
-            this.previousPresidentIndex = this.presidentIndex;
-            this.presidentIndex = null;
-            this.channcelorIndex = null;
-            this.chancellor = null;
-            this.speciallyElectedPresident = true;
-            this.chancellorRequestedVeto = false;
-        
-            this.sendMessageLine(`${this.president.nickname} is now the President`);
-            this.setState(Game.GameStates.NominateChancellor);
+            this.setState(Game.GameStates.AssignPresident);
+            this.assignNextPresident();
         }
     }
     
@@ -565,7 +580,7 @@ class Game {
     }
     
     shootPlayer(author, player) {
-        if (!this.checkStates(Game.GameStates.PresidentShootPlayer)) return;
+        if (!this.checkState(Game.GameStates.PresidentShootPlayer)) return;
         
         if (author.id === this.president.id) {
             const player = this.findPlayer(player.id);
@@ -581,7 +596,7 @@ class Game {
                 this.gameRunning = false;
                 this.setState(Game.GameStates.Finished);
             } else {
-                this.sendMessageLine('Hitler was not shot. Game continues.';
+                this.sendMessageLine('Hitler was not shot. Game continues.');
                 this.setState(Game.GameStates.AssignPresident);
                 this.assignNextPresident();
             }
@@ -620,7 +635,7 @@ class Game {
     }
     
     findUsersPlaying(author, players) {
-        this.sendMessageLine('Finding players...');
+        log('Finding players...');
         
         let foundPlayers = [];
         
@@ -632,8 +647,9 @@ class Game {
             foundPlayers = this.getUsersFromIds(playerIds);
         }
         
+        let notice = '';        
         if (foundPlayers.length > 10) {
-            this.sendMessageLine('Found more than 10 possible players, using the first 10 found.');
+            notice += 'Found more than 10 possible players, using the first 10 found.\n';
             foundPlayers = foundPlayers.slice(0, 10);
         }
         
@@ -645,11 +661,13 @@ class Game {
         
         this.doesHitlerKnowFacists = this.players.length <= 6;
         
-        this.sendMessageLine('The following users are now playing:');
+        notice += 'The following users are now playing:\n';
         
         for(var i = 0; i < this.players.length; i++) {
-            this.sendMessageLine(this.players[i].nickname);
+            notice += `${this.players[i].nickname}\n`;
         }
+        
+        this.sendMessageLine(notice);
     }
     
     startGame(players, message) {
@@ -665,13 +683,11 @@ class Game {
         
         this.gameRunning = true;
         this.setState(Game.GameStates.Setup);
-        this.sendMessageLine('Starting a new game of Secret Hitler!');
-        this.sendMessageLine('--------------------------------------\n');
+        this.sendMessageLine('Starting a new game of Secret Hitler!\n--------------------------------------\n');
         
         this.findUsersPlaying(message.author, players);
         
-        this.sendMessageLine('--------------------------------------\n');
-        
+        this.createGameboard();
         this.createMemberships();
         this.createDeck();
         this.shufflePlayerOrder();        
@@ -697,6 +713,8 @@ class Game {
         } else {
             info += 'No players dead';
         }
+        
+        this.sendMessageLine(info);
     }
     
     static get Commands() {
@@ -737,23 +755,29 @@ class Game {
             },
             {
                 name: 'elect',
-                description: 'Elects a specially elected president (when allowed)',
+                description: 'Elects a specially elected president (when applicable)',
                 usage: '!elect <player>',
                 example: '!nominate @Squid#3288',
                 action: 'speciallyElectPresident'
-            }
+            },
             {
                 name: 'shoot',
-                description: 'Shoots the specified player (if allowed)',
+                description: 'Shoots the specified player (when applicable)',
                 usage: '!shoot <player>',
                 example: '!shoot @Squid#3288',
                 action: 'shootPlayer'            
             },
             {
                 name: 'veto',
-                description: 'Initates a veto of the current policies (if allowed)',
+                description: 'Initates a veto of the current policies (when applicable)',
                 usage: '!veto',
                 action: 'vetoPolicies'            
+            },
+            {
+                name: 'consent',
+                description: 'Consents or denies to a requested veto (when applicable)',
+                usage: '!consent <ja|nein>',
+                action: 'consentVetoRequest'            
             },
             {
                 name: 'info',

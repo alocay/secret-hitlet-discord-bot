@@ -1,46 +1,45 @@
 "use strict";
 
-const 5_6PlayerBoard = [
-    Gameboard.PresidentialPowers.None,
-    Gameboard.PresidentialPowers.None,
-    Gameboard.PresidentialPowers.PolicyPeek,
-    Gameboard.PresidentialPowers.Execution,
-    Gameboard.PresidentialPowers.Execution,
-];
-
-const 7_8PlayerBoard = [
-    Gameboard.PresidentialPowers.None,
-    Gameboard.PresidentialPowers.InvestigateLoyalty,
-    Gameboard.PresidentialPowers.SpecialElection,
-    Gameboard.PresidentialPowers.Execution,
-    Gameboard.PresidentialPowers.Execution,
-];
-
-const 9_10PlayerBoard = [
-    Gameboard.PresidentialPowers.InvestigateLoyalty,
-    Gameboard.PresidentialPowers.InvestigateLoyalty,
-    Gameboard.PresidentialPowers.SpecialElection,
-    Gameboard.PresidentialPowers.Execution,
-    Gameboard.PresidentialPowers.Execution,
-];
-
 class Gameboard {
     constructor(numOfPlayers) 
     {
-        this.numOfPlayers = numOfPlayers;
-        this.gameboardType = getGameboardType(numOfPlayers);
+        this.gameboardType = this.getGameboardType(numOfPlayers);
         this.facistPolices = 0;
         this.liberalPolices = 0;
-        this.govtRejectCount = 0;   
+        this.govtRejectCount = 0;
+        
+        this.PlayerBoard5_6 = [
+            Gameboard.PresidentialPowers.None,
+            Gameboard.PresidentialPowers.None,
+            Gameboard.PresidentialPowers.PolicyPeek,
+            Gameboard.PresidentialPowers.Execution,
+            Gameboard.PresidentialPowers.Execution,
+        ];
+        
+        this.PlayerBoard7_8 = [
+            Gameboard.PresidentialPowers.None,
+            Gameboard.PresidentialPowers.InvestigateLoyalty,
+            Gameboard.PresidentialPowers.SpecialElection,
+            Gameboard.PresidentialPowers.Execution,
+            Gameboard.PresidentialPowers.Execution,
+        ];
+        
+        this.PlayerBoard9_10 = [
+            Gameboard.PresidentialPowers.InvestigateLoyalty,
+            Gameboard.PresidentialPowers.InvestigateLoyalty,
+            Gameboard.PresidentialPowers.SpecialElection,
+            Gameboard.PresidentialPowers.Execution,
+            Gameboard.PresidentialPowers.Execution,
+        ];
     }
     
     getGameboardType(numOfPlayers) {
         if (numOfPlayers <= 6) {
-            return 5_6PlayerBoard;
+            return this.PlayerBoard5_6;
         } else if (numOfPlayers <= 8) {
-            return 7_8PlayerBoard;
+            return this.PlayerBoard7_8;
         } else if (numOfPlayers <= 10) {
-            return 9_10PlayerBoard;
+            return this.PlayerBoard9_10;
         }
         
         return null;
