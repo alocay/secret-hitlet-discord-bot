@@ -27,7 +27,11 @@ const getRandomInt = function getRandomInt(max) {
 
 const log = function log(msg) {
     console.log(msg);
-}
+};
+
+const extractUserId = function extractUserId(callout) {
+    return callout.replace(/[<@!>]/g, '');
+};
 
 class Game {
     constructor(client) {
@@ -90,7 +94,7 @@ class Game {
         let msg = 'You have the following policy options:\n\n';
         
         for (var i = 0; i < this.drawnPolicies.length; i++) {
-            msg += `${i+1} - ${this.drawPolicies[i]}\n`;
+            msg += `${i+1} - ${this.drawnPolicies[i]}\n`;
         }
         
         msg += '\n\nPlease use !discard <card#> in the channel to discard your choice. The rest will be passed to the elected Chancellor';
@@ -101,8 +105,8 @@ class Game {
     getPeekPolicyInfo() {
         let msg = 'The following are the top 3 policies:\n\n';
         
-        for (var i = 0; i < this.drawnPolicies.length; i++) {
-            msg += `${this.drawPolicies[i]}\n`;
+        for (var i = 0; i < 3; i++) {
+            msg += `${this.deck[i]}\n`;
         }
         
         return msg;
@@ -133,7 +137,7 @@ class Game {
     
     validatePolicyNumber(policy) {
         const policyNumber = parseInt(policy, 10);
-        if (isNaN(policyNumber) || policyNumber < 1 || policyNumber > this.drawPolicies.length) {
+        if (isNaN(policyNumber) || policyNumber < 1 || policyNumber > this.drawnPolicies.length) {
             this.sendMessageLine(`${policy} is not a valid discard option`);
             return null;
         }
@@ -187,16 +191,17 @@ class Game {
     createDeck() {
         log('Creating policy deck...');
         for (var i = 0; i < FacistPolicies; i++) {
-            this.deck.push('F');
+            this.deck.push(Game.Policies.Facist);
         }
 
         for (var i = 0; i < LiberalPolicies; i++) {
-            this.deck.push('L');
+            this.deck.push(Game.Policies.Liberal);
         }
 
         this.shuffleDeck();
         
         log('Shuffling policy deck...');
+        log(this.deck);
     }
 
     shuffleDeck() {
@@ -270,10 +275,13 @@ class Game {
         
         this.previousGovernment = [];
         this.previousGovernment.push(this.president.id);
-        this.previousGovernment.push(this.chancellor.id);
+        
+        if (this.chancellor) {
+            this.previousGovernment.push(this.chancellor.id);
+            this.chancellor.resetAllowances();
+        }
         
         this.president.resetAllowances();
-        this.chancellor.resetAllowances();
         
         this.channcelorIndex = null;
         this.chancellor = null;
@@ -299,10 +307,15 @@ class Game {
     }
     
     nominateChancellor(author, nominated) {
+        log('Nominating chancellor...');
+        
         if (!this.checkState(Game.GameStates.NominateChancellor)) return;
         
         if (author.id === this.president.id) {
-            const player = this.findPlayer(nominated.id);
+            const player = this.findPlayer(extractUserId(nominated));
+            
+            if (!player) return;
+            
             const wasInPrevGovt = this.previousGovernment.find(id => id === player.id);
             
             if (player.isDead) {
@@ -313,7 +326,7 @@ class Game {
                 return;
             }
             
-            this.sendMessageLine(`${this.president.nickname} has nominated ${player.nickname} as Chancellor`);
+            this.sendMessageLine(`${this.president.nickname} has nominated ${player.nickname} as Chancellor\n. Everyone should now vote using !vote <ja|nein>...`);
             this.nominatedChancellor = player;
             this.setState(Game.GameStates.VoteOnNomination);
         }
@@ -325,6 +338,7 @@ class Game {
         vote = vote.toLowerCase();        
         const player = this.findPlayer(author.id);
         if (this.nominatedChancellor && player && !this.votes[player.id]) {
+            log('vote: '+ vote);
             if (vote === 'nein' || vote === 'n' || vote === 'no') {
                 this.votes[player.id] = 1;
             } else if (vote === 'ja' || vote === 'j' || vote === 'y' || vote === 'yes') {
@@ -339,8 +353,9 @@ class Game {
             let neins = 0;
             
             if (this.votes.count === this.players.length) {
+                log(this.votes);
                 for(var i = 0; i < this.players.length; i++) {
-                    if (this.votes[player.id] === 1) {
+                    if (this.votes[this.players[i].id] === 1) {
                         neins++;
                     } else {
                         jas++;
@@ -354,11 +369,11 @@ class Game {
                 if (jas > neins) {
                     msg += 'The JAs have it\n\n';
                     this.sendMessageLine(msg);
-                    electChancellor();
+                    this.electChancellor();
                 } else {
                     msg += 'The NEINs have it\n\n';
                     this.sendMessageLine(msg);
-                    rejectNomination();
+                    this.rejectNomination();
                 }
             }
         }
@@ -370,7 +385,7 @@ class Game {
         this.sendMessageLine(`${this.chancellor.nickname} has been elected chancellor.`);
         this.setState(Game.GameStates.PresidentDrawPolicies);
         
-        if (doFacistsWin()) {
+        if (this.doFacistsWin()) {
             this.gameRunning = false;
             this.setState(Game.GameStates.Finished);
         }
@@ -423,7 +438,7 @@ class Game {
         if (!policyNumber) return;
         
         const discardedPolicies = this.drawnPolicies.splice((policyNumber - 1), 1);
-        discardPile = discardPile.concat(discardedPolicies);
+        this.discardPile = this.discardPile.concat(discardedPolicies);
         
         if (this.checkState(Game.GameStates.PresidentDiscardPolicy)) {
             this.handOverToChancellor();
@@ -485,12 +500,14 @@ class Game {
         
         this.sendMessageLine(this.gameBoard.getGameboardDisplay());
         
-        if (doFacistsWin() || doLiberalsWin()) {
+        log('checking win conditions...');
+        if (this.doFacistsWin() || this.doLiberalsWin()) {
             this.gameRunning = false;
             this.setState(Game.GameStates.Finished);
             return;
         }
         
+        log('checking exec actions...');
         const executiveAction = this.gameBoard.getUnlockedExecutionAction();
         if (executiveAction != Gameboard.PresidentialPowers.None) {
             this.handleExecutiveAction(executiveAction);
@@ -501,6 +518,7 @@ class Game {
     }
     
     handleExecutiveAction(executiveAction) {
+        log(`handling exec action: ${executiveAction}`);
         if (executiveAction === Gameboard.PresidentialPowers.PolicyPeek) {
             this.setState(Game.GameStates.PresidentPolicyPeek);
             this.executePolicyPeek();
@@ -520,6 +538,11 @@ class Game {
     
     executePolicyPeek() {
         this.sendMessageLine(`The Policy Peek Executive Action has been unlocked.\nSending President ${this.president.nickname} the top 3 policies...`);
+        
+        if (this.deck.length < 3) {
+            this.shuffleAndAddDiscardPile();
+        }
+        
         this.president.user.send(this.getPeekPolicyInfo());
         
         this.setState(Game.GameStates.AssignPresident);
@@ -535,7 +558,7 @@ class Game {
         if (!this.checkState(Game.GameStates.PresidentInvestigatePlayer)) return;
         
         if (author.id === this.president.id) {
-            const player = this.findPlayer(user.id);
+            const player = this.findPlayer(extractUserId(user));
             const hasBeenInvestigated = this.investigatedPlayers.find(p => p.id === player.id);
             
             if (hasBeenInvestigated) {
@@ -562,7 +585,7 @@ class Game {
         if (!this.checkState(Game.GameStates.SpeciallyElectPresident)) return;
         
         if (author.id === this.president.id) {
-            const player = this.findPlayer(newPres.id);
+            const player = this.findPlayer(extractUserId(newPres));
             
             if (player.isDead) {
                 this.sendMessageLine(`${player.nickname} is dead and cannot be chosen as President`);
@@ -579,11 +602,11 @@ class Game {
         this.setState(Game.GameStates.PresidentShootPlayer);
     }
     
-    shootPlayer(author, player) {
+    shootPlayer(author, user) {
         if (!this.checkState(Game.GameStates.PresidentShootPlayer)) return;
         
         if (author.id === this.president.id) {
-            const player = this.findPlayer(player.id);
+            const player = this.findPlayer(extractUserId(user));
             
             if (player.isDead) {
                 this.sendMessageLine(`${player.nickname} has already been executed and cannot be made more dead`);
@@ -592,7 +615,7 @@ class Game {
                 player.isDead = true;
             }
             
-            if (doLiberalsWin()) {
+            if (this.doLiberalsWin()) {
                 this.gameRunning = false;
                 this.setState(Game.GameStates.Finished);
             } else {
@@ -643,7 +666,7 @@ class Game {
             foundPlayers = this.getAllUsersInAuthorsChannel(author);
         } else {
             const playersArray = players.split(" ");
-            const playerIds = playersArray.map(u => u.replace(/[<@!>]/g, ''));
+            const playerIds = playersArray.map(u => extractUserId(u));
             foundPlayers = this.getUsersFromIds(playerIds);
         }
         
@@ -656,8 +679,6 @@ class Game {
         for(var i = 0; i < foundPlayers.length; i++) {
             this.players.push(new Player(foundPlayers[i]));
         }
-        
-        this.gameboard = new Gameboard(this.players.length);
         
         this.doesHitlerKnowFacists = this.players.length <= 6;
         

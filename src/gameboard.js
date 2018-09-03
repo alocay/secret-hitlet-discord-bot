@@ -3,7 +3,6 @@
 class Gameboard {
     constructor(numOfPlayers) 
     {
-        this.gameboardType = this.getGameboardType(numOfPlayers);
         this.facistPolices = 0;
         this.liberalPolices = 0;
         this.govtRejectCount = 0;
@@ -31,6 +30,8 @@ class Gameboard {
             Gameboard.PresidentialPowers.Execution,
             Gameboard.PresidentialPowers.Execution,
         ];
+        
+        this.gameboardType = this.getGameboardType(numOfPlayers);
     }
     
     getGameboardType(numOfPlayers) {
@@ -53,7 +54,7 @@ class Gameboard {
         this.liberalPolices++;
     }
     
-    increaseElectrionTracker() {
+    increaseElectionTracker() {
         this.govtRejectCount++;
     }
     
