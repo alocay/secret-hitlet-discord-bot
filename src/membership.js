@@ -1,3 +1,4 @@
+"use strict";
 
 class Membership {
     constructor(party, role) 

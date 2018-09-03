@@ -32,12 +32,16 @@ class Player {
         this.hasPoliciesToDiscard = false;
     }
     
+    getPartyMembershipInfo() {
+        let info = `The following is the party membership info for ${this.nickname}\n\n`;
+        info += `Party: ${Membership.GetPartyString(this.membership.party)}`;
+    }
+    
     getFullMembershipInfo(hitler, facists, doesHitlerKnow) {        
         let info = 'Here is your party/role info:\n';
         info += '-------------------------------------\n\n';
         info += `Party: ${Membership.GetPartyString(this.membership.party)}\n`;
-        info += `Role: ${Membership.GetRoleString(this.membership.role)}\n`;
-        info += '\n';
+        info += `Role: ${Membership.GetRoleString(this.membership.role)}\n\n`;
         
         if (this.isHitler && doesHitlerKnow) {
             info += 'The following are your Facist partners:\n';
