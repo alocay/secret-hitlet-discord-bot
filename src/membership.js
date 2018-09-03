@@ -1,5 +1,5 @@
 
-class Memebership {
+class Membership {
     constructor(party, role) 
     {
         this.party = party;
@@ -21,15 +21,46 @@ class Memebership {
         }
     }
     
+    static GetRoleString(role) {
+        switch(role) {
+            case Membership.Roles.Liberal:
+                return 'Liberal';
+                break;
+            case Membership.Roles.Facist:
+                return 'Facist';
+                break;
+            case Membership.Roles.Hitler:
+                return 'Hitler'
+                break;
+        }
+        
+        return '';
+    }
+    
+    static GetPartyString(party) {
+        switch(party) {
+            case Membership.Parties.Liberal:
+                return 'Liberal';
+                break;
+            case Membership.Parties.Facist:
+                return 'Facist';
+                break;
+        }
+        
+        return '';
+    }
+    
     static CreateLiberal() {
-        return new Memebership(Membership.Party.Liberal, Membership.Roles.Liberal);
+        return new Membership(Membership.Parties.Liberal, Membership.Roles.Liberal);
     }
     
     static CreateFacist() {
-        return new Memebership(Membership.Party.Facist, Membership.Roles.Facist);
+        return new Membership(Membership.Parties.Facist, Membership.Roles.Facist);
     }
     
     static CreateHitler() {
-        return new Memebership(Membership.Party.Facist, Membership.Roles.Hitler);
+        return new Membership(Membership.Parties.Facist, Membership.Roles.Hitler);
     }
 }
+
+export default Membership;
