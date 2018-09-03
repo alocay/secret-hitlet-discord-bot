@@ -66,7 +66,7 @@ class Gameboard {
     }
     
     getUnlockedExecutionAction() {
-        if (facistPolices == 0) return Gameboard.PresidentialPowers.None;
+        if (this.facistPolices === 0) return Gameboard.PresidentialPowers.None;
         return this.gameboardType[this.facistPolices - 1];
     }
     
