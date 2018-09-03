@@ -4,7 +4,8 @@
   "description": "Discord bot to play Secret Hitler",
   "main": "index.js",
   "scripts": {
-    "build": "babel src -d lib --copy-files"
+    "build": "babel src -d lib --copy-files",
+    "start": "babel src -d lib --copy-files && node lib/index.js"
   },
   "author": "Armando Locay",
   "license": "MIT",

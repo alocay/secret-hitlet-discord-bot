@@ -39,7 +39,7 @@ client.on('message', async message => {
     const command = client.commands.get(commandName);
     
     if(command && command.action) {
-        command.action(client, commandArgs.join(' '));
+        command.action(commandArgs.join(' '), message);
     } else {
         message.reply(`Unknown command ${prefix}${commandName}. Use !help to see available commands`);
     }

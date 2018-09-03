@@ -40,10 +40,18 @@ class Game {
         this.drawnPolicies = [];
     }
     
-    getPlayers() {
-        if (!this.client) return;
+    getPlayers(playerIds) {       
         
+    }
+    
+    function getAllPlayersInAuthorsChannel(author) {
+        var voiceChannelId = author.lastMessage.member.voiceChannelID;
+        var voiceChannel = this.client.channels.get(voiceChannelId);
+        return voiceChannel.members;
         
+        /*const mem = vc.members.map(x => x.nickname);    
+        mem.unshift('Members:\n');
+        mem.join('');*/
     }
     
     createMemberships() {
@@ -150,7 +158,17 @@ class Game {
         return this.liberalPolices == 5;
     }
     
-    startGame() {
+    startGame(players, message) {
+        if (!this.client) return;
+        
+        if (!players) {
+            this.getAllPlayersInAuthorsChannel(message.author);
+        } else {
+            const playersArray = players.split(" ");
+            const playerIds = playersArray.map(u => u.replace(/[<@!>]/g, ''));
+        }
+        
+        this.getPlayers(playerIds);
         this.createMemberships();
         this.createDeck();
         this.shufflePlayerOrder();
