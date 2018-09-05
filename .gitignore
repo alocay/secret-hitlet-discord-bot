@@ -1,3 +1,7 @@
+# Ignored files #
+#################
+config.json
+
 # Output folder #
 #################
 /lib
