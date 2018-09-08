@@ -5,13 +5,13 @@ const getRandomInt = function getRandomInt(max) {
 };
 
 class MockUser {
-	constructor() {
-		this.id = getRandomInt(10000).toString();
-		this.nickname = `mock_user ${this.id}`;
-	}
-	
-	send(msg) {
-	}
+    constructor() {
+        this.id = getRandomInt(10000).toString();
+        this.nickname = `mock_user ${this.id}`;
+    }
+    
+    send(msg) {
+    }
 }
 
 export default MockUser;

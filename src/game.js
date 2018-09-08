@@ -389,6 +389,7 @@ class Game {
     }
     
     electChancellor() {
+		this.votes = { count: 0 };
         this.chancellor = this.nominatedChancellor;
         this.nominatedChancellor = null;
         this.sendMessageLine(`${this.chancellor.nickname} has been elected chancellor.`);
@@ -401,6 +402,7 @@ class Game {
     }
     
     rejectNomination() {
+		this.votes = { count: 0 };
         this.gameBoard.increaseElectionTracker();
         const msg = `${this.nominatedChancellor.nickname} was not elected chancellor.\nRejected Election Tracker: ${this.gameBoard.NumOfRejectedGovts}`
                 
@@ -410,6 +412,7 @@ class Game {
         
         if (this.gameBoard.NumOfRejectedGovts >= 3) {
             this.enactTopPolicy();
+            return;
         }
         
         this.setState(Game.GameStates.AssignPresident);
@@ -417,7 +420,7 @@ class Game {
     }
     
     enactTopPolicy() {
-        this.enactPolicy(this.deck.pop());
+        this.enactPolicy(this.deck.shift());
     }
     
     drawPolicies(author) {
@@ -430,7 +433,7 @@ class Game {
                 this.shuffleAndAddDiscardPile();
             }
         
-            this.drawnPolicies = this.deck.slice(0, 3);            
+            this.drawnPolicies = this.deck.splice(0, 3);            
             player.user.send(this.getDrawnPolicyInfo());
             this.setState(Game.GameStates.PresidentDiscardPolicy);
         }
@@ -517,7 +520,7 @@ class Game {
         }
         
         this.log('checking exec actions...');
-        const executiveAction = this.gameBoard.getUnlockedExecutionAction();
+        const executiveAction = this.gameBoard.getUnlockedExecutiveAction();
         if (executiveAction != Gameboard.PresidentialPowers.None) {
             this.handleExecutiveAction(executiveAction);
         } else {
