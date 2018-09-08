@@ -316,6 +316,11 @@ class Game {
             
 			if (!player) return;
             
+			if (player.id === author.id) {
+				this.sendMessageLine(`President ${player.nickname} cannot nominate themself`);
+                return;
+			}
+			
             const wasInPrevGovt = this.previousGovernment.find(id => id === player.id);
             
             if (player.isDead) {

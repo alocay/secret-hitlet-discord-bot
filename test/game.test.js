@@ -116,68 +116,124 @@ describe('Tests for the game logic', () => {
 		game.setState.callCount.should.equal(3);
 	});
 	
-	it('Should nominate a chancellor', () => {
-		const game = new Game(client);
+	describe('Chancellor nomination tests', () => {
+		it('Should nominate a chancellor', () => {
+			const game = new Game(client);
+			
+			game.startGame(null, message);		
+			
+			const nonPresidentPlayer = getNonPresidentPlayer(game);		
+			const nominatedDiscordUserId = createDiscordUserId(nonPresidentPlayer.id);
+			
+			sinon.spy(game, 'setState');
+			game.nominateChancellor(game.president, nominatedDiscordUserId);
+			
+			game.gameState.should.equal(Game.GameStates.VoteOnNomination);
+			game.setState.should.have.been.calledOnce;
+		});
 		
-		game.startGame(null, message);		
+		it('Should not nominate a chancellor if not on the NominateChancellor state', () => {
+			const game = new Game(client);
+			
+			game.startGame(null, message);
+			
+			game.setState(Game.GameStates.AssignPresident);
+			
+			const nonPresidentPlayer = getNonPresidentPlayer(game);		
+			const nominatedDiscordUserId = createDiscordUserId(nonPresidentPlayer.id);
+			
+			sinon.spy(game, 'setState');
+			game.nominateChancellor(game.president, nominatedDiscordUserId);
+			
+			game.setState.should.have.not.been.called;
+		});
 		
-		const nonPresidentPlayer = getNonPresidentPlayer(game);		
-		const nominatedDiscordUserId = createDiscordUserId(nonPresidentPlayer.id);
+		it('Should not nominate a dead player', () => {
+			const game = new Game(client);
+			
+			game.startGame(null, message);
+			
+			const nonPresidentPlayer = getNonPresidentPlayer(game);
+			nonPresidentPlayer.isDead.should.be.false;		
+			nonPresidentPlayer.isDead = true;
+			
+			const nominatedDiscordUserId = createDiscordUserId(nonPresidentPlayer.id);
+			
+			sinon.spy(game, 'setState');
+			game.nominateChancellor(game.president, nominatedDiscordUserId);
+					
+			game.gameState.should.equal(Game.GameStates.NominateChancellor);
+			game.setState.should.have.not.been.called;
+		});
 		
-		sinon.spy(game, 'setState');
-		game.nominateChancellor(game.president, nominatedDiscordUserId);
+		it('Should not nominate a player in previous govt', () => {
+			const game = new Game(client);
+			
+			game.startGame(null, message);
+			
+			const nonPresidentPlayer = getNonPresidentPlayer(game);		
+			const nominatedDiscordUserId = createDiscordUserId(nonPresidentPlayer.id);
+			game.previousGovernment.push(nonPresidentPlayer.id);
+			
+			sinon.spy(game, 'setState');
+			game.nominateChancellor(game.president, nominatedDiscordUserId);
+					
+			game.gameState.should.equal(Game.GameStates.NominateChancellor);
+			game.setState.should.have.not.been.called;
+		});
 		
-		game.gameState.should.equal(Game.GameStates.VoteOnNomination);
-		game.setState.should.have.been.calledOnce;
+		it('Should not accepts nominations from a non-president player', () => {
+			const game = new Game(client);
+			
+			game.startGame(null, message);
+			
+			const nonPresidentPlayer = getNonPresidentPlayer(game);
+			let nominatedPlayer = getNonPresidentPlayer(game);
+			
+			while(nominatedPlayer.id === nonPresidentPlayer.id) {
+				nominatedPlayer = getNonPresidentPlayer(game);
+			}
+			
+			const nominatedDiscordUserId = createDiscordUserId(nominatedPlayer.id);
+			
+			sinon.spy(game, 'setState');
+			game.nominateChancellor(nonPresidentPlayer, nominatedPlayer);
+					
+			game.gameState.should.equal(Game.GameStates.NominateChancellor);
+			game.setState.should.have.not.been.called;
+		});
+		
+		it('Should not allow a player to nominate themself', () => {
+			const game = new Game(client);
+			
+			game.startGame(null, message);
+					
+			const nominatedDiscordUserId = createDiscordUserId(game.president.id);
+			
+			sinon.spy(game, 'setState');
+			game.nominateChancellor(game.president, nominatedDiscordUserId);
+					
+			game.gameState.should.equal(Game.GameStates.NominateChancellor);
+			game.setState.should.have.not.been.called;
+		});
 	});
 	
-	it('Should not nominate a chancellor if not on the NominateChancellor state', () => {
-		const game = new Game(client);
-		
-		game.startGame(null, message);
-		
-		game.setState(Game.GameStates.AssignPresident);
-		
-		const nonPresidentPlayer = getNonPresidentPlayer(game);		
-		const nominatedDiscordUserId = createDiscordUserId(nonPresidentPlayer.id);
-		
-		sinon.spy(game, 'setState');
-		game.nominateChancellor(game.president, nominatedDiscordUserId);
-		
-		game.setState.should.have.not.been.called;
-	});
-	
-	it('Should not nominate a dead player', () => {
-		const game = new Game(client);
-		
-		game.startGame(null, message);
-		
-		const nonPresidentPlayer = getNonPresidentPlayer(game);
-		nonPresidentPlayer.isDead.should.be.false;		
-		nonPresidentPlayer.isDead = true;
-		
-		const nominatedDiscordUserId = createDiscordUserId(nonPresidentPlayer.id);
-		
-		sinon.spy(game, 'setState');
-		game.nominateChancellor(game.president, nominatedDiscordUserId);
-				
-		game.gameState.should.equal(Game.GameStates.NominateChancellor);
-		game.setState.should.have.not.been.called;
-	});
-	
-	it('Should not nominate a player in previous govt', () => {
-		const game = new Game(client);
-		
-		game.startGame(null, message);
-		
-		const nonPresidentPlayer = getNonPresidentPlayer(game);		
-		const nominatedDiscordUserId = createDiscordUserId(nonPresidentPlayer.id);
-		game.previousGovernment.push(nonPresidentPlayer.id);
-		
-		sinon.spy(game, 'setState');
-		game.nominateChancellor(game.president, nominatedDiscordUserId);
-				
-		game.gameState.should.equal(Game.GameStates.NominateChancellor);
-		game.setState.should.have.not.been.called;
+	describe('Nomination voting tests', () => {
+		it('Should elect the chancellor if the jas have a majority', () => {
+			const game = new Game(client);
+			
+			game.startGame(null, message);
+			const nonPresidentPlayer = getNonPresidentPlayer(game);
+			
+			game.nominatedChancellor = nonPresidentPlayer;
+			game.setState(Game.GameStates.VoteOnNomination);
+			
+			game.players.forEach(p => game.voteOnNomination(p, 'ja'));
+			
+			game.votes.count.should.equal(game.players.length);
+			game.chancellor.id.should.equal(nonPresidentPlayer.id);
+			should.not.exist(game.nominatedChancellor);
+			game.gameState.should.equal(Game.GameStates.PresidentDrawPolicies);
+		});
 	});
 });
