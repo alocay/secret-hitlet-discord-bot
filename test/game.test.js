@@ -5,6 +5,7 @@ import sinon from 'sinon';
 import sinonChai from 'sinon-chai';
 import MockUser from './mockuser.js';
 import Game from '../src/game.js';
+import Gameboard from '../src/gameboard.js';
 const { cmd_channel } = require('../src/config.json');
 
 const should = chai.should();
@@ -465,6 +466,201 @@ describe('Tests for the game logic', () => {
             game.gameState.should.equal(Game.GameStates.PresidentDiscardPolicy);
             game.setState.should.have.been.calledOnce;
             game.shuffleAndAddDiscardPile.should.have.been.calledOnce;
+        });
+    });
+    
+    describe('President discard tests', () => {
+        const setupGameForPolicyDiscardByPresident = function setupGameForPolicyDiscardByPresident() {
+            const game = new Game(client);            
+            game.startGame(null, message);
+            
+            const chancellor = getNonPresidentPlayer(game);
+            game.chancellor = chancellor;
+            game.drawnPolicies = game.deck.splice(0, 3);
+            
+            game.setState(Game.GameStates.PresidentDiscardPolicy);
+            sinon.spy(game, 'setState');
+            
+            return [game, game.discardPile.length];
+        };
+        
+        const checkIfNotDiscarded = function checkIfNotDiscarded(game, expectedDiscardLength) {
+            game.drawnPolicies.length.should.equal(3);
+            game.discardPile.length.should.equal(expectedDiscardLength);
+            game.gameState.should.equal(Game.GameStates.PresidentDiscardPolicy);
+            game.setState.should.not.have.been.called;
+        };
+        
+        it('Should not discard a policy if the state is incorrect', () => {
+            const game = new Game(client);            
+            game.startGame(null, message);
+            sinon.spy(game, 'setState');
+            
+            game.discardPolicy(game.president, 1);
+            
+            game.gameState.should.equal(Game.GameStates.NominateChancellor);
+            game.setState.should.not.have.been.called;
+        });
+        
+        it('Should not discard a policy if state is PresidentDiscardPolicy and not the president', () => {
+            const [game, initialDiscardPileLength] = setupGameForPolicyDiscardByPresident();
+            const nonPresidentPlayer = getNonPresidentPlayer(game);
+            
+            game.discardPolicy(nonPresidentPlayer, 1);
+            
+            checkIfNotDiscarded(game, initialDiscardPileLength);
+        });
+        
+        it('Should discard a policy and handover remaining to chancellor', () => {
+            const [game, initialDiscardPileLength] = setupGameForPolicyDiscardByPresident();
+            const expectedDiscard = game.drawnPolicies[0];
+            
+            game.discardPolicy(game.president, 1);
+            
+            game.drawnPolicies.length.should.equal(2);
+            game.discardPile.length.should.equal(initialDiscardPileLength + 1);
+            game.gameState.should.equal(Game.GameStates.ChancellorDiscardPolicy);
+            game.setState.should.have.been.calledOnce;
+        });
+        
+        it('Should not discard a policy if the discard option is not a number', () => {
+            const [game, initialDiscardPileLength] = setupGameForPolicyDiscardByPresident();
+            
+            game.discardPolicy(game.president, 'a');
+            
+            checkIfNotDiscarded(game, initialDiscardPileLength);
+        });
+        
+        it('Should not discard a policy if the discard option is not 1-3', () => {
+            const [game, initialDiscardPileLength] = setupGameForPolicyDiscardByPresident();
+            
+            game.discardPolicy(game.president, game.drawnPolicies.length + 1);
+            
+            checkIfNotDiscarded(game, initialDiscardPileLength);
+        });
+        
+        it('Should place the discarded policy in the discard pile', () => {
+            const [game, initialDiscardPileLength] = setupGameForPolicyDiscardByPresident();
+            const expectedDiscard = game.drawnPolicies[0];
+            
+            game.discardPolicy(game.president, 1);            
+            const [lastInDiscard] = game.discardPile.slice(-1);
+            
+            game.drawnPolicies.length.should.equal(2);
+            game.discardPile.length.should.equal(initialDiscardPileLength + 1);
+            lastInDiscard.should.equal(expectedDiscard);
+        });
+    });
+    
+    describe('Chancellor discard tests', () => {
+        const setupGameForPolicyDiscardByChancellor = function setupGameForPolicyDiscardByChancellor() {
+            const game = new Game(client);            
+            game.startGame(null, message);
+            
+            const chancellor = getNonPresidentPlayer(game);
+            game.chancellor = chancellor;
+            game.drawnPolicies = game.deck.splice(0, 3);
+            game.discardPile = game.drawnPolicies.splice(0, 1);
+            
+            game.setState(Game.GameStates.ChancellorDiscardPolicy);
+            sinon.spy(game, 'setState');
+            
+            return [game, game.discardPile.length];
+        };
+        
+        const checkIfNotDiscarded = function checkIfNotDiscarded(game, expectedDiscardLength) {
+            game.drawnPolicies.length.should.equal(2);
+            game.discardPile.length.should.equal(expectedDiscardLength);
+            game.gameState.should.equal(Game.GameStates.ChancellorDiscardPolicy);
+            game.setState.should.not.have.been.called;
+        };
+        
+        it('Should not discard a policy if the state is incorrect', () => {
+            const game = new Game(client);            
+            game.startGame(null, message);
+            game.chancellor = getNonPresidentPlayer(game);
+            sinon.spy(game, 'setState');
+            
+            game.discardPolicy(game.chancellor, 1);
+            
+            game.gameState.should.equal(Game.GameStates.NominateChancellor);
+            game.setState.should.not.have.been.called;
+        });
+        
+        it('Should not discard a policy if state is ChancellorDiscardPolicy and not the chancellor', () => {
+            const [game, initialDiscardPileLength] = setupGameForPolicyDiscardByChancellor();
+            
+            game.discardPolicy(game.president, 1);
+            
+            checkIfNotDiscarded(game, initialDiscardPileLength);
+        });
+        
+        it('Should discard a policy and enact remaining policy', () => {
+            const [game, initialDiscardPileLength] = setupGameForPolicyDiscardByChancellor();
+            const expectedDiscard = game.drawnPolicies[0];
+            const expectedEnactedPolicy = game.drawnPolicies[1];
+            sinon.spy(game.gameBoard, 'resetElectionTracker');
+            
+            game.discardPolicy(game.chancellor, 1);
+            
+            game.drawnPolicies.length.should.equal(1);
+            game.discardPile.length.should.equal(initialDiscardPileLength + 1);
+            
+            if (expectedEnactedPolicy === Game.Policies.Facist) {
+                game.gameBoard.facistPolicies.should.equal(1);
+            } else if (expectedEnactedPolicy === Game.Policies.Liberal) {
+                game.gameBoard.liberalPolicies.should.equal(1);
+            }
+            
+            game.gameBoard.govtRejectCount.should.equal(0);
+            game.gameBoard.resetElectionTracker.should.have.been.calledOnce;
+            game.gameState.should.equal(Game.GameStates.NominateChancellor);
+            game.setState.should.have.been.calledTwice;
+        });
+        
+        it('Should not discard a policy if the discard option is not a number', () => {
+            const [game, initialDiscardPileLength] = setupGameForPolicyDiscardByChancellor();
+            
+            game.discardPolicy(game.chancellor, 'a');
+            
+            checkIfNotDiscarded(game, initialDiscardPileLength);
+        });
+        
+        it('Should not discard a policy if the discard option is not 1-3', () => {
+            const [game, initialDiscardPileLength] = setupGameForPolicyDiscardByChancellor();
+            
+            game.discardPolicy(game.chancellor, game.drawnPolicies.length + 1);
+            
+            checkIfNotDiscarded(game, initialDiscardPileLength);
+        });
+        
+        it('Should place the discarded policy in the discard pile', () => {
+            const [game, initialDiscardPileLength] = setupGameForPolicyDiscardByChancellor();
+            const expectedDiscard = game.drawnPolicies[0];
+            
+            game.discardPolicy(game.chancellor, 1);            
+            const [lastInDiscard] = game.discardPile.slice(-1);
+            
+            game.drawnPolicies.length.should.equal(1);
+            game.discardPile.length.should.equal(initialDiscardPileLength + 1);
+            lastInDiscard.should.equal(expectedDiscard);
+        });
+    });
+    
+    describe('Policy peek executive action tests', () => {
+        it('Should only execute a policy peek when instructed', () => {
+            const game = new Game(client);            
+            game.startGame(null, message);
+            
+            sinon.spy(game, 'setState');
+            
+            game.handleExecutiveAction(Gameboard.PresidentialPowers.PolicyPeek);
+            
+            // check peeked cards
+            
+            game.gameState.should.equal(Game.GameStates.NominateChancellor);
+            game.setState.should.been.calledWith(Game.GameStates.PresidentPolicyPeek);
+            game.setState.should.have.been.calledThrice;
         });
     });
 });
