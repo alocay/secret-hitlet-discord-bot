@@ -107,8 +107,13 @@ class Game {
     getPeekPolicyInfo() {
         let msg = 'The following are the top 3 policies:\n\n';
         
-        for (var i = 0; i < 3; i++) {
-            msg += `${this.deck[i]}\n`;
+        const peekedPolicies = this.deck.slice(0, 3);
+        if (this.client.test_peekedPolicies) {
+            this.client.test_peekedPolicies = peekedPolicies.concat([]);
+        }
+        
+        for (var i = 0; i < peekedPolicies.length; i++) {
+            msg += `${peekedPolicies[i]}\n`;
         }
         
         return msg;
@@ -571,7 +576,7 @@ class Game {
         
         if (author.id === this.president.id) {
             const player = this.findPlayer(extractUserId(user));
-            const hasBeenInvestigated = this.investigatedPlayers.find(p => p.id === player.id);
+            const hasBeenInvestigated = this.investigatedPlayers.find(pid => pid === player.id);
             
             if (hasBeenInvestigated) {
                 this.sendMessageLine(`${player.nickname} has already been investigated and cannot be investigated twice in a game`);

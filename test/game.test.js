@@ -78,6 +78,7 @@ describe('Tests for the game logic', () => {
         
         client = {
             isMock: true,
+            test_peekedPolicies: [],
             channels: {
                 get: function (id) { return channels.find(c => c.id === id); }
             },
@@ -647,20 +648,303 @@ describe('Tests for the game logic', () => {
         });
     });
     
+    describe('President assignment tests', () => {
+        it('Should assign a random president', () => {
+            const game = new Game(client);
+            game.startGame(null, message);
+            game.gameState = Game.GameStates.AssignPresident;
+            sinon.spy(game, 'setState');
+            
+            game.assignRandomPresident();
+            
+            game.president.should.exist;
+            game.president.id.should.equal(game.players[game.presidentIndex].id);
+            game.gameState.should.equal(Game.GameStates.NominateChancellor);
+            game.setState.should.have.been.calledOnce;
+        });
+        
+        it('Should assign the next player as president', () => {
+            const game = new Game(client);
+            game.startGame(null, message);
+            game.gameState = Game.GameStates.AssignPresident;
+            const initialPresidentId = game.president.id;
+            const expectedNewIndex = (game.presidentIndex + 1) % game.players.length;
+            sinon.spy(game, 'setState');
+            
+            game.assignNextPresident();
+            
+            game.president.id.should.not.equal(initialPresidentId); 
+            game.presidentIndex.should.equal(expectedNewIndex);
+            game.president.id.should.equal(game.players[expectedNewIndex].id);
+            game.gameState.should.equal(Game.GameStates.NominateChancellor);
+            game.setState.should.have.been.calledOnce;
+        });
+        
+        it('Should assign the next alive player as president', () => {
+            const game = new Game(client);
+            game.startGame(null, message);
+            game.gameState = Game.GameStates.AssignPresident;
+            sinon.spy(game, 'setState');
+            
+            const initialPresidentId = game.president.id;
+            const nextPlayerIndex = (game.presidentIndex + 1) % game.players.length;
+            const expectedNewIndex = (nextPlayerIndex + 1) % game.players.length;
+            game.players[nextPlayerIndex].isDead = true;
+            
+            game.assignNextPresident();
+            
+            game.president.id.should.not.equal(initialPresidentId); 
+            game.presidentIndex.should.equal(expectedNewIndex);
+            game.president.id.should.equal(game.players[expectedNewIndex].id);
+            game.gameState.should.equal(Game.GameStates.NominateChancellor);
+            game.setState.should.have.been.calledOnce;
+        });
+        
+        it('Should reset the current govt', () => {
+            const game = new Game(client);
+            game.startGame(null, message);
+            game.gameState = Game.GameStates.AssignPresident;
+            game.chancellorRequestedVeto = true;
+            game.chancellor = getNonPresidentPlayer(game);
+            
+            game.assignNextPresident();
+            
+            should.not.exist(game.chancellor);
+            game.chancellorRequestedVeto.should.be.false;
+        });
+        
+        it('Should store the previous govt', () => {
+            const game = new Game(client);
+            game.startGame(null, message);
+            game.chancellor = getNonPresidentPlayer(game);
+            game.gameState = Game.GameStates.AssignPresident;
+            const initialPresidentId =  game.president.id;
+            const chancellorId = game.chancellor.id;
+            
+            game.assignNextPresident();
+            
+            game.previousGovernment.should.not.be.empty;
+            game.previousGovernment.length.should.equal(2);
+            game.previousGovernment.should.include(initialPresidentId);
+            game.previousGovernment.should.include(chancellorId);
+        });
+        
+        it('Should assign a specially elected player to president', () => {
+            const game = new Game(client);
+            game.startGame(null, message);
+            game.gameState = Game.GameStates.AssignPresident;
+            sinon.spy(game, 'setState');
+            
+            const initialPresidentIndex = game.presidentIndex;
+            const newPres = getNonPresidentPlayer(game);
+            
+            game.assignNextPresident(newPres);
+            
+            game.president.should.exist;
+            game.president.id.should.equal(newPres.id);
+            game.speciallyElectedPresident.should.be.true;
+            game.previousPresidentIndex.should.equal(initialPresidentIndex);
+            game.gameState.should.equal(Game.GameStates.NominateChancellor);
+            game.setState.should.have.been.calledOnce;
+        });
+        
+        it('Should revert to the old order after a special election', () => {
+            const game = new Game(client);
+            game.startGame(null, message);
+            game.gameState = Game.GameStates.AssignPresident;
+            
+            const initialPresidentIndex = game.presidentIndex;
+            const newPres = getNonPresidentPlayer(game);
+            
+            game.assignNextPresident(newPres);
+            
+            const expectedNewIndex = (initialPresidentIndex + 1) % game.players.length; 
+            const expectedNewPres = game.players[expectedNewIndex];
+            game.gameState = Game.GameStates.AssignPresident;
+            sinon.spy(game, 'setState');
+            
+            game.assignNextPresident();
+            
+            game.president.should.exist;
+            game.president.id.should.equal(expectedNewPres.id);
+            game.presidentIndex.should.equal(expectedNewIndex);
+            game.speciallyElectedPresident.should.be.false;
+            should.not.exist(game.previousPresidentIndex);
+            game.gameState.should.equal(Game.GameStates.NominateChancellor);
+            game.setState.should.have.been.calledOnce;
+        });
+    });
+    
+    describe('Handle executive actions tests', () => {
+        it('Should execute the correct action for the provided presidential power', () => {
+            const game = new Game(client);            
+            game.startGame(null, message);
+            sinon.spy(game, 'setState');
+            sinon.spy(game, 'executePolicyPeek');
+            sinon.spy(game, 'startLoyaltyInvestigation');
+            sinon.spy(game, 'startSpecialElection');
+            sinon.spy(game, 'startExecution');
+            
+            game.handleExecutiveAction(Gameboard.PresidentialPowers.PolicyPeek);
+            
+            game.executePolicyPeek.should.have.been.calledOnce;
+            game.startLoyaltyInvestigation.should.not.have.been.called;
+            game.startSpecialElection.should.not.have.been.called;
+            game.startExecution.should.not.have.been.called;
+            game.setState.should.have.been.calledThrice;
+            game.setState.should.been.calledWith(Game.GameStates.PresidentPolicyPeek);
+            
+            game.setState.resetHistory();
+            game.executePolicyPeek.resetHistory();
+            
+            game.handleExecutiveAction(Gameboard.PresidentialPowers.InvestigateLoyalty);
+            
+            game.executePolicyPeek.should.not.have.been.called;
+            game.startLoyaltyInvestigation.should.have.been.calledOnce;
+            game.startSpecialElection.should.not.have.been.called;
+            game.startExecution.should.not.have.been.called;
+            game.setState.should.have.been.calledTwice;
+            game.setState.should.been.calledWith(Game.GameStates.PresidentInvestigateLoyalty);
+            
+            game.setState.resetHistory();
+            game.startLoyaltyInvestigation.resetHistory();
+            
+            game.handleExecutiveAction(Gameboard.PresidentialPowers.SpecialElection);
+            
+            game.executePolicyPeek.should.not.have.been.called;
+            game.startLoyaltyInvestigation.should.not.have.been.called;
+            game.startSpecialElection.should.have.been.calledOnce;
+            game.startExecution.should.not.have.been.called;
+            game.setState.should.have.been.calledTwice;
+            game.setState.should.been.calledWith(Game.GameStates.PresidentSpecialElection);
+            
+            game.setState.resetHistory();
+            game.startSpecialElection.resetHistory();
+            
+            game.handleExecutiveAction(Gameboard.PresidentialPowers.Execution);
+            
+            game.executePolicyPeek.should.not.have.been.called;
+            game.startLoyaltyInvestigation.should.not.have.been.called;
+            game.startSpecialElection.should.not.have.been.called;
+            game.startExecution.should.have.been.calledOnce;
+            game.setState.should.have.been.calledTwice;
+            game.setState.should.been.calledWith(Game.GameStates.PresidentExecution);
+        });
+    });
+    
     describe('Policy peek executive action tests', () => {
         it('Should only execute a policy peek when instructed', () => {
             const game = new Game(client);            
             game.startGame(null, message);
+            const initialGameState = game.gameState;
             
             sinon.spy(game, 'setState');
             
-            game.handleExecutiveAction(Gameboard.PresidentialPowers.PolicyPeek);
+            game.executePolicyPeek();
+                        
+            game.gameState.should.equal(initialGameState);
+            game.setState.should.have.been.calledTwice;
+        });
+        
+        it('Should show the next 3 policies', () => {
+            const game = new Game(client);            
+            game.startGame(null, message);
+            const expectedPeek = game.deck.slice(0, 3);
             
-            // check peeked cards
+            game.executePolicyPeek();
             
+            game.client.test_peekedPolicies.length.should.equal(3);
+            
+            for(var i = 0; i < expectedPeek.length; i++) {
+                game.client.test_peekedPolicies[i].should.equal(expectedPeek[i]);
+            }
+        });
+    });
+    
+    describe('Investigate loyalty tests', () => {
+        it('Investigate player should only be allowed if the state is PresidentInvestigatePlayer', () => {
+            const game = new Game(client);            
+            game.startGame(null, message);
+            sinon.spy(game, 'setState');
+            const initialGameState = game.gameState;
+            
+            game.investigatePlayer(game.president, createDiscordUserId(getNonPresidentPlayer(game).id));
+            
+            game.gameState.should.equal(initialGameState);
+            game.setState.should.not.have.been.called;
+        });
+        
+        it('Start investigation should set the state to PresidentInvestigatePlayer', () => {
+            const game = new Game(client);            
+            game.startGame(null, message);
+            sinon.spy(game, 'setState');
+            
+            game.startLoyaltyInvestigation();
+            
+            game.gameState.should.equal(Game.GameStates.PresidentInvestigatePlayer);
+            game.setState.should.have.been.calledOnce;
+        });
+        
+        it('Should investigate chosen user', () => {
+            const game = new Game(client);
+            game.startGame(null, message);
+            const chosenPlayer = getNonPresidentPlayer(game);
+            const chosenUserId = createDiscordUserId(chosenPlayer.id);
+            game.setState(Game.GameStates.PresidentInvestigatePlayer);
+            sinon.spy(game, 'setState');
+            
+            game.investigatePlayer(game.president, chosenUserId);
+            
+            game.investigatedPlayers.length.should.equal(1);
+            game.investigatedPlayers.should.include(chosenPlayer.id);
+            game.setState.should.have.been.calledTwice;
             game.gameState.should.equal(Game.GameStates.NominateChancellor);
-            game.setState.should.been.calledWith(Game.GameStates.PresidentPolicyPeek);
-            game.setState.should.have.been.calledThrice;
+        });
+        
+        it('Should not investigate if author is not president', () => {
+            const game = new Game(client);
+            game.startGame(null, message);
+            const nonPresidentPlayer = getNonPresidentPlayer(game);
+            const chosenUserId = createDiscordUserId(game.president.id);
+            game.setState(Game.GameStates.PresidentInvestigatePlayer);
+            sinon.spy(game, 'setState');
+            
+            game.investigatePlayer(nonPresidentPlayer, chosenUserId);
+            
+            game.gameState.should.equal(Game.GameStates.PresidentInvestigatePlayer);
+            game.setState.should.not.have.been.called;
+        });
+        
+        it('Should not investigate a player that has already been investigated', () => {
+            const game = new Game(client);
+            game.startGame(null, message);
+            const chosenPlayer = getNonPresidentPlayer(game);
+            const chosenUserId = createDiscordUserId(chosenPlayer.id);
+            game.setState(Game.GameStates.PresidentInvestigatePlayer);
+            sinon.spy(game, 'setState');
+            
+            game.investigatedPlayers.push(chosenPlayer.id);
+            game.investigatePlayer(game.president, chosenUserId);
+            
+            game.investigatedPlayers.length.should.equal(1);
+            game.gameState.should.equal(Game.GameStates.PresidentInvestigatePlayer);
+            game.setState.should.not.have.been.called;
+        });
+        
+        it('Should not investigate a player that is dead', () => {
+            const game = new Game(client);
+            game.startGame(null, message);
+            const chosenPlayer = getNonPresidentPlayer(game);
+            const chosenUserId = createDiscordUserId(chosenPlayer.id);
+            game.setState(Game.GameStates.PresidentInvestigatePlayer);
+            sinon.spy(game, 'setState');
+            
+            chosenPlayer.isDead = true;
+            game.investigatePlayer(game.president, chosenUserId);
+            
+            game.investigatedPlayers.should.be.empty;
+            game.gameState.should.equal(Game.GameStates.PresidentInvestigatePlayer);
+            game.setState.should.not.have.been.called;
         });
     });
 });
