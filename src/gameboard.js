@@ -3,8 +3,8 @@
 class Gameboard {
     constructor(numOfPlayers) 
     {
-        this.facistPolices = 0;
-        this.liberalPolices = 0;
+        this.facistPolicies = 0;
+        this.liberalPolicies = 0;
         this.govtRejectCount = 0;
         
         this.PlayerBoard5_6 = [
@@ -47,11 +47,11 @@ class Gameboard {
     }
     
     enactFacistPolicy() {
-        this.facistPolices++;
+        this.facistPolicies++;
     }
     
     enactLiberalPolicy() {
-        this.liberalPolices++;
+        this.liberalPolicies++;
     }
     
     increaseElectionTracker() {
@@ -63,27 +63,27 @@ class Gameboard {
     }
     
     isVetoUnlocked() {
-        return this.facistPolices === 5;
+        return this.facistPolicies === 5;
     }
     
-    getUnlockedExecutionAction() {
-        if (this.facistPolices === 0) return Gameboard.PresidentialPowers.None;
-        return this.gameboardType[this.facistPolices - 1];
+    getUnlockedExecutiveAction() {
+        if (this.facistPolicies === 0) return Gameboard.PresidentialPowers.None;
+        return this.gameboardType[this.facistPolicies - 1];
     }
     
     getGameboardDisplay() {
-        let info = `Facist Policies: ${this.facistPolices}\n`;
-        info += `Liberal Policies: ${this.liberalPolices}\n`;
+        let info = `Facist Policies: ${this.facistPolicies}\n`;
+        info += `Liberal Policies: ${this.liberalPolicies}\n`;
         info += `Rejected Govts: ${this.govtRejectCount} (policy enacted at 3)\n\n`;
         return info;
     }
     
     get NumOfFacistPolicies() {
-        return this.facistPolices;
+        return this.facistPolicies;
     }
     
     get NumOfLiberalPolicies() {
-        return this.liberalPolices;
+        return this.liberalPolicies;
     }
     
     get NumOfRejectedGovts() {
