@@ -57,6 +57,8 @@ class Game {
         this.chancellorRequestedVeto = false;
         this.votes = { count: 0 };
         this.investigatedPlayers = [];
+        this.facistsWon = false;
+        this.liberalsWon = false;
         
         if (this.client) {
             this.gameChannel = this.client.channels.get(cmd_channel);
@@ -400,7 +402,7 @@ class Game {
         this.sendMessageLine(`${this.chancellor.nickname} has been elected chancellor.`);
         this.setState(Game.GameStates.PresidentDrawPolicies);
         
-        if (this.doFacistsWin()) {
+        if (this.doFacistsWin(true)) {
             this.gameRunning = false;
             this.setState(Game.GameStates.Finished);
         }
@@ -607,10 +609,13 @@ class Game {
             if (player.isDead) {
                 this.sendMessageLine(`${player.nickname} is dead and cannot be chosen as President`);
                 return;
+            } else if (player.id === this.president.id) {
+                this.sendMessageLine(`President ${player.nickname} cannot elect themself`);
+                return;
             }
             
             this.setState(Game.GameStates.AssignPresident);
-            this.assignNextPresident();
+            this.assignNextPresident(player);
         }
     }
     
@@ -628,6 +633,9 @@ class Game {
             if (player.isDead) {
                 this.sendMessageLine(`${player.nickname} has already been executed and cannot be made more dead`);
                 return;
+            } else if (player.id === this.president.id) {
+                this.sendMessageLine(`Sorry, you can't shoot yourself ${player.nickname}`);
+                return;
             } else {
                 player.isDead = true;
             }
@@ -643,31 +651,37 @@ class Game {
         }
     }
     
-    doFacistsWin() {
-        if (this.gameBoard.NumOfFacistPolicies == 6) {
+    doFacistsWin(justElected = false) {
+        if (this.gameBoard.NumOfFacistPolicies === 6) {
             const msg = `6 Facist policies enacted!\n{this.hitler.nickname} and his facists win!`;
             this.sendMessageLine(msg);
+            this.facistsWon = true;
             return true;
         }
 
-        if (this.gameBoard.NumOfFacistPolicies >= 3 && this.channcelor.isHitler) {
-            const msg = `{this.channcelor.nickname} is Hitler!\n{this.hitler.nickname} and his facists win!`;
-            this.sendMessageLine(msg);
-            return true;
+        if (justElected) {
+            if (this.gameBoard.NumOfFacistPolicies >= 3 && this.chancellor && this.chancellor.isHitler) {
+                const msg = `{this.channcelor.nickname} is Hitler!\n{this.hitler.nickname} and his facists win!`;
+                this.sendMessageLine(msg);
+                this.facistsWon = true;
+                return true;
+            }
         }
         
         return false;
     }
     
     doLiberalsWin() {
-        if (this.gameBoard.NumOfLiberalPolicies == 5) {
+        if (this.gameBoard.NumOfLiberalPolicies === 5) {
             const msg = `5 Liberal policies enacted!\nThe Liberals win!`;
             this.sendMessageLine(msg);
+            this.liberalsWon = true;
             return true;
         }
         
-        if (this.hitler.isDead) {
+        if (this.hitler && this.hitler.isDead) {
             const msg = `Hitler (${this.hitler.nickname}) has been killed!\n The Liberals win!`;
+            this.liberalsWon = true;
             return true;
         }
         

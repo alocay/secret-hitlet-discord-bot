@@ -758,6 +758,9 @@ describe('Tests for the game logic', () => {
             
             game.assignNextPresident(newPres);
             
+            game.previousPresidentIndex.should.exist;
+            game.speciallyElectedPresident.should.be.true;
+            
             const expectedNewIndex = (initialPresidentIndex + 1) % game.players.length; 
             const expectedNewPres = game.players[expectedNewIndex];
             game.gameState = Game.GameStates.AssignPresident;
@@ -945,6 +948,333 @@ describe('Tests for the game logic', () => {
             game.investigatedPlayers.should.be.empty;
             game.gameState.should.equal(Game.GameStates.PresidentInvestigatePlayer);
             game.setState.should.not.have.been.called;
+        });
+    });
+    
+    describe('Special election tests', () => {
+         it('Special election should only be allowed if the state is SpeciallyElectPresident', () => {
+            const game = new Game(client);            
+            game.startGame(null, message);
+            sinon.spy(game, 'setState');
+            const initialGameState = game.gameState;
+            
+            game.speciallyElectPresident(game.president, createDiscordUserId(getNonPresidentPlayer(game).id));
+            
+            game.gameState.should.equal(initialGameState);
+            game.setState.should.not.have.been.called;
+        });
+        
+        it('Start special election should set the state to SpeciallyElectPresident', () => {
+            const game = new Game(client);            
+            game.startGame(null, message);
+            sinon.spy(game, 'setState');
+            
+            game.startSpecialElection();
+            
+            game.gameState.should.equal(Game.GameStates.SpeciallyElectPresident);
+            game.setState.should.have.been.calledOnce;
+        });
+        
+        it('Should specially elect the chosen user', () => {
+            const game = new Game(client);
+            game.startGame(null, message);
+            const chosenPlayer = getNonPresidentPlayer(game);
+            const chosenUserId = createDiscordUserId(chosenPlayer.id);
+            const initialPresidentIndex = game.presidentIndex;
+            game.setState(Game.GameStates.SpeciallyElectPresident);
+            sinon.spy(game, 'setState');
+            
+            game.speciallyElectPresident(game.president, chosenUserId);
+            
+            game.president.id.should.equal(chosenPlayer.id);
+            game.previousPresidentIndex.should.equal(initialPresidentIndex);
+            game.speciallyElectedPresident.should.be.true;
+            game.setState.should.have.been.calledTwice;
+            game.gameState.should.equal(Game.GameStates.NominateChancellor);
+        });
+        
+        it('Should not specially elect if the author is not the president', () => {
+            const game = new Game(client);
+            game.startGame(null, message);
+            const author = getNonPresidentPlayer(game);
+            const chosenPlayer = getNonPresidentPlayer(game);
+            const chosenUserId = createDiscordUserId(chosenPlayer.id);
+            const initialPresidentId = game.president.id;
+            game.setState(Game.GameStates.SpeciallyElectPresident);
+            sinon.spy(game, 'setState');
+            
+            game.speciallyElectPresident(author, chosenUserId);
+            
+            game.president.id.should.equal(initialPresidentId);
+            game.speciallyElectedPresident.should.be.false;
+            game.setState.should.have.not.been.called;
+            game.gameState.should.equal(Game.GameStates.SpeciallyElectPresident);
+            should.not.exist(game.previousPresidentIndex);
+        });
+        
+        it('Should not specially elect the president', () => {
+            const game = new Game(client);
+            game.startGame(null, message);
+            const chosenUserId = createDiscordUserId(game.president.id);
+            const initialPresidentId = game.president.id;
+            game.setState(Game.GameStates.SpeciallyElectPresident);
+            sinon.spy(game, 'setState');
+            
+            game.speciallyElectPresident(game.president, chosenUserId);
+            
+            game.president.id.should.equal(initialPresidentId);
+            game.speciallyElectedPresident.should.be.false;
+            game.setState.should.have.not.been.called;
+            game.gameState.should.equal(Game.GameStates.SpeciallyElectPresident);
+            should.not.exist(game.previousPresidentIndex);
+        });
+        
+        it('Should not specially elect a dead player', () => {
+            const game = new Game(client);
+            game.startGame(null, message);
+            const chosenPlayer = getNonPresidentPlayer(game);
+            const chosenUserId = createDiscordUserId(chosenPlayer.id);
+            const initialPresidentId = game.president.id;
+            chosenPlayer.isDead = true;
+            game.setState(Game.GameStates.SpeciallyElectPresident);
+            sinon.spy(game, 'setState');
+            
+            game.speciallyElectPresident(game.president, chosenUserId);
+            
+            game.president.id.should.equal(initialPresidentId);
+            game.speciallyElectedPresident.should.be.false;
+            game.setState.should.have.not.been.called;
+            game.gameState.should.equal(Game.GameStates.SpeciallyElectPresident);
+            should.not.exist(game.previousPresidentIndex);
+        });
+    });
+    
+    describe('Execution tests', () => {
+         it('Execution should only be allowed if the state is PresidentShootPlayer', () => {
+            const game = new Game(client);            
+            game.startGame(null, message);
+            sinon.spy(game, 'setState');
+            const initialGameState = game.gameState;
+            
+            game.shootPlayer(game.president, createDiscordUserId(getNonPresidentPlayer(game).id));
+            
+            game.gameState.should.equal(initialGameState);
+            game.setState.should.not.have.been.called;
+        });
+        
+        it('Start execution should set the state to PresidentShootPlayer', () => {
+            const game = new Game(client);            
+            game.startGame(null, message);
+            sinon.spy(game, 'setState');
+            
+            game.startExecution();
+            
+            game.gameState.should.equal(Game.GameStates.PresidentShootPlayer);
+            game.setState.should.have.been.calledOnce;
+        });
+        
+        it('Should execute the chosen user', () => {
+            const game = new Game(client);
+            game.startGame(null, message);
+            const chosenPlayer = getNonPresidentPlayer(game);
+            const chosenUserId = createDiscordUserId(chosenPlayer.id);
+            let liberalsExpectedToWin = chosenPlayer.isHitler;
+            
+            game.setState(Game.GameStates.PresidentShootPlayer);
+            sinon.spy(game, 'setState');
+            
+            game.shootPlayer(game.president, chosenUserId);
+            
+            chosenPlayer.isDead.should.be.true;
+            
+            if (liberalsExpectedToWin) {
+                game.setState.should.have.been.calledOnce;
+                game.gameState.should.equal(Game.GameStates.Finished);
+                game.gameRunning.should.be.false;
+            } else {            
+                game.setState.should.have.been.calledTwice;
+                game.gameState.should.equal(Game.GameStates.NominateChancellor);
+            }
+        });
+        
+        it('Should not shoot if the author is not the president', () => {
+            const game = new Game(client);
+            game.startGame(null, message);
+            const author = getNonPresidentPlayer(game);
+            const chosenPlayer = getNonPresidentPlayer(game);
+            const chosenUserId = createDiscordUserId(chosenPlayer.id);
+            
+            game.setState(Game.GameStates.PresidentShootPlayer);
+            sinon.spy(game, 'setState');
+            
+            game.shootPlayer(author, chosenUserId);
+            
+            chosenPlayer.isDead.should.be.false;
+            game.gameState.should.equal(Game.GameStates.PresidentShootPlayer);
+            game.setState.should.not.have.been.called;
+        });
+        
+        it('Should not shoot the president', () => {
+            const game = new Game(client);
+            game.startGame(null, message);
+            const chosenUserId = createDiscordUserId(game.president.id);
+            const initialPresidentId = game.president.id;
+            game.setState(Game.GameStates.PresidentShootPlayer);
+            sinon.spy(game, 'setState');
+            
+            game.shootPlayer(game.president, chosenUserId);
+            
+            game.president.isDead.should.be.false;
+            game.gameState.should.equal(Game.GameStates.PresidentShootPlayer);
+            game.setState.should.not.have.been.called;
+        });
+        
+        it('Should not shoot a dead player', () => {
+            const game = new Game(client);
+            game.startGame(null, message);
+            const chosenPlayer = getNonPresidentPlayer(game);
+            const chosenUserId = createDiscordUserId(chosenPlayer.id);
+            chosenPlayer.isDead = true;
+            
+            game.setState(Game.GameStates.PresidentShootPlayer);
+            sinon.spy(game, 'setState');
+            
+            game.shootPlayer(game.president, chosenUserId);
+            
+            game.gameState.should.equal(Game.GameStates.PresidentShootPlayer);
+            game.setState.should.not.have.been.called;
+        });
+    });
+    
+    describe('Facist win condition tests', () => {
+        it('Should win if 6 facist policies are enacted', () => {
+            const game = new Game(client);            
+            game.startGame(null, message);
+            game.gameBoard.facistPolicies = 5;
+            
+            game.doFacistsWin().should.be.false;
+            
+            game.gameBoard.facistPolicies = 6;
+            
+            game.doFacistsWin().should.be.true;
+        });
+        
+        it('Should win if Hitler is elected chancellor and 3 facist policies have been enacted', () => {
+            const game = new Game(client);
+            game.startGame(null, message);            
+            const nonHitler = game.players.find(p => !p.isHitler);            
+            const hitler = game.players.find(p => p.isHitler);
+            
+            game.gameBoard.facistPolicies = 2;
+            game.chancellor = nonHitler;
+            game.doFacistsWin().should.be.false;
+            
+            game.chancellor = hitler;
+            game.doFacistsWin().should.be.false;
+            
+            game.gameBoard.facistPolicies = 3;
+            game.chancellor = nonHitler;
+            game.doFacistsWin().should.be.false;
+            
+            game.chancellor = hitler;       
+            game.doFacistsWin(true).should.be.true;
+        });
+    });
+    
+    describe('Liberal win condition tests', () => {
+        it('Should win if 5 liberal policies are enacted', () => {
+            const game = new Game(client);            
+            game.startGame(null, message);
+            game.gameBoard.liberalPolicies = 4;
+            
+            game.doLiberalsWin().should.be.false;
+            
+            game.gameBoard.liberalPolicies = 5;
+            
+            game.doLiberalsWin().should.be.true;
+        });
+        
+        it('Should win if Hitler is killed', () => {
+            const game = new Game(client);
+            game.startGame(null, message);        
+            const hitler = game.players.find(p => p.isHitler);
+            
+            game.doLiberalsWin().should.be.false;
+            
+            hitler.isDead = true;
+            game.doLiberalsWin().should.be.true;
+        });
+    });
+
+    describe('Semi end-to-end Facist win condition tests', () => {
+        it('Should win if 6 facist policies are enacted', () => {
+            const game = new Game(client);            
+            game.startGame(null, message);
+            game.gameBoard.facistPolicies = 5;
+            
+            for(var i = 0; i < 5; i++) {
+                game.enactPolicy(Game.Policies.Facist);
+            }
+            
+            game.doFacistsWin().should.be.false;
+            game.facistsWon.should.be.false;
+            game.gameBoard.facistPolicies.length.should.equal(5);
+            
+            game.enactPolicy(Game.Policies.Facist);
+            
+            game.facistsWon.should.be.true;
+            game.gameRunning.should.be.false;
+            game.gameState.should.equal(Game.GameStates.Finished);
+        });
+        
+        it('Should win if Hitler is elected chancellor and 3 facist policies have been enacted', () => {
+            const game = new Game(client);
+            game.startGame(null, message);           
+            const hitler = game.players.find(p => p.isHitler);
+            
+            while(game.president.isHitler) {
+                game.president = getNonPresidentPlayer(game);
+            }
+            
+            for(var i = 0; i < 3; i++) {
+                game.enactPolicy(Game.Policies.Facist);
+            }
+            
+            game.facistsWon.should.be.false;
+            game.gameBoard.facistPolicies.length.should.equal(2);
+            
+            game.nominatedChancellor = hitler;
+            game.electChancellor();
+            
+            game.facistsWon.should.be.true;
+            game.gameRunning.should.be.false;
+            game.gameState.should.equal(Game.GameStates.Finished);
+        });
+        
+        it('Should not win if 3rd facist policy is enacted while Hitler is current chancellor', () => {
+            const game = new Game(client);
+            game.startGame(null, message);            
+            const nonHitler = game.players.find(p => !p.isHitler);            
+            const hitler = game.players.find(p => p.isHitler);
+            
+            while(game.president.isHitler) {
+                game.president = getNonPresidentPlayer(game);
+            }
+            
+            for(var i = 0; i < 2; i++) {
+                game.enactPolicy(Game.Policies.Facist);
+            }
+            
+            game.nominatedChancellor = hitler;
+            game.electChancellor();
+            
+            game.facistsWon.should.be.false;
+            game.gameBoard.facistPolicies.length.should.equal(2);
+            
+            game.enactPolicy(Game.Policies.Facist);
+            
+            game.facistsWon.should.be.false;
+            game.gameRunning.should.be.true;
         });
     });
 });
