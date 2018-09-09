@@ -648,7 +648,198 @@ describe('Tests for the game logic', () => {
         });
     });
     
+    describe('Chancellor veto request tests', () => {
+        const setupGameForVetoConsent = function setupGameForVetoConsent() {
+            const game = new Game(client);            
+            game.startGame(null, message);
+            game.chancellor = getNonPresidentPlayer(game);
+            game.setState(Game.GameStates.PresidentDrawPolicies);
+            
+            game.drawPolicies(game.president);
+            game.gameState.should.equal(Game.GameStates.PresidentDiscardPolicy);            
+            
+            game.discardPolicy(game.president, 1);
+            game.gameState.should.equal(Game.GameStates.ChancellorDiscardPolicy);
+            
+            game.vetoPolicies(game.chancellor);
+            game.gameState.should.equal(Game.GameStates.ChancellorVetoRequested);
+            
+            sinon.spy(game, 'setState');
+            sinon.spy(game.gameBoard, 'increaseElectionTracker');
+            
+            return [game, game.discardPile.length, game.drawnPolicies.concat([])];
+        };
+        
+        const checkForAcceptConsent = function checkForAcceptConsent(game, initialDiscardLength, vetoedPolicies) {
+            const [secondToLast, lastInDiscard] = game.discardPile.slice(-2);
+            vetoedPolicies.length.should.equal(2);
+            game.gameBoard.increaseElectionTracker.should.have.been.calledOnce;
+            game.chancellorRequestedVeto.should.be.false;
+            game.setState.should.have.been.calledTwice;
+            game.gameState.should.equal(Game.GameStates.NominateChancellor);
+            game.discardPile.length.should.equal(initialDiscardLength + 2);
+            vetoedPolicies[0].should.equal(secondToLast);
+            vetoedPolicies[1].should.equal(lastInDiscard);
+            game.drawnPolicies.should.be.empty;
+        };
+        
+        const checkForRejectConsent = function checkForRejectConsent(game, initialDiscardLength, vetoedPolicies) {
+            game.drawnPolicies.should.not.be.empty;
+            game.setState.should.have.been.calledOnce;
+            game.gameState.should.equal(Game.GameStates.ChancellorDiscardPolicy);
+            game.chancellorRequestedVeto.should.be.true;
+            game.gameBoard.increaseElectionTracker.should.not.have.been.called;
+            game.discardPile.length.should.equal(initialDiscardLength);
+            vetoedPolicies.length.should.equal(2);
+            game.drawnPolicies.length.should.equal(2);
+            game.drawnPolicies.should.include(vetoedPolicies[0]);
+            game.drawnPolicies.should.include(vetoedPolicies[1]);
+        };
+        
+        it('Should allow a veto request if the state is ChancellorDiscardPolicy', () => {
+            const game = new Game(client);            
+            game.startGame(null, message);
+            game.chancellor = getNonPresidentPlayer(game);
+            sinon.spy(game, 'setState');
+            
+            game.vetoPolicies(game.chancellor);
+            
+            game.chancellorRequestedVeto.should.be.false;
+            game.gameState.should.equal(Game.GameStates.NominateChancellor);
+            game.setState.should.not.have.been.called;            
+            game.setState(Game.GameStates.ChancellorDiscardPolicy);
+            game.setState.resetHistory();
+            
+            game.vetoPolicies(game.chancellor);
+
+            game.chancellorRequestedVeto.should.be.true;
+            game.gameState.should.equal(Game.GameStates.ChancellorVetoRequested);
+            game.setState.should.have.been.calledOnce;
+        });
+
+        it('Should ignore veto request from non-chancellors', () => {
+            const game = new Game(client);            
+            game.startGame(null, message);
+            game.chancellor = getNonPresidentPlayer(game);
+            game.setState(Game.GameStates.ChancellorDiscardPolicy);
+            sinon.spy(game, 'setState');
+            
+            game.vetoPolicies(game.president);
+            
+            game.chancellorRequestedVeto.should.be.false;
+            game.gameState.should.equal(Game.GameStates.ChancellorDiscardPolicy);
+            game.setState.should.not.have.been.called;
+        });
+        
+        it('Should ignore veto requests if on was already requested', () => {
+            const game = new Game(client);            
+            game.startGame(null, message);
+            game.chancellor = getNonPresidentPlayer(game);
+            game.setState(Game.GameStates.ChancellorDiscardPolicy);
+            game.chancellorRequestedVeto = true;
+            sinon.spy(game, 'setState');
+            
+            game.vetoPolicies(game.chancellor);
+            
+            game.gameState.should.equal(Game.GameStates.ChancellorDiscardPolicy);
+            game.setState.should.not.have.been.called;
+        });
+        
+        it('Should only allow a veto consent if the state is ChancellorVetoRequested', () => {
+            const game = new Game(client);            
+            game.startGame(null, message);
+            game.chancellor = getNonPresidentPlayer(game);
+            game.chancellorRequestedVeto = true;
+            sinon.spy(game, 'setState');
+            
+            game.consentVetoRequest(game.president, 'n');
+            
+            game.chancellorRequestedVeto.should.be.true;
+            game.setState.should.not.have.been.called;
+            
+            game.setState(Game.GameStates.ChancellorVetoRequested);
+            game.setState.resetHistory();
+            
+            game.consentVetoRequest(game.president, 'n');
+
+            game.gameState.should.equal(Game.GameStates.ChancellorDiscardPolicy);
+            game.setState.should.have.been.calledOnce;
+        });
+        
+        it('Should only allow veto consents from the president', () => {
+            const [game, initialDiscardLength, vetoedPolicies] = setupGameForVetoConsent();
+            game.chancellorRequestedVeto.should.be.true;
+            
+            game.consentVetoRequest(getNonPresidentPlayer(game), 'y');
+            
+            game.chancellorRequestedVeto.should.be.true;
+            game.setState.should.not.have.been.called;
+            game.gameState.should.equal(Game.GameStates.ChancellorVetoRequested);
+        });
+        
+        it('Should accept ja, j, y, yes, nein, n, and no as consent options', () => {
+            let [game, initialDiscardLength, vetoedPolicies] = setupGameForVetoConsent();
+            game.consentVetoRequest(game.president, 'ja');
+            checkForAcceptConsent(game, initialDiscardLength, vetoedPolicies);
+            
+            [game, initialDiscardLength, vetoedPolicies] = setupGameForVetoConsent();
+            game.consentVetoRequest(game.president, 'JA');
+            checkForAcceptConsent(game, initialDiscardLength, vetoedPolicies);
+            
+            [game, initialDiscardLength, vetoedPolicies] = setupGameForVetoConsent();
+            game.consentVetoRequest(game.president, 'j');
+            checkForAcceptConsent(game, initialDiscardLength, vetoedPolicies);
+            
+            [game, initialDiscardLength, vetoedPolicies] = setupGameForVetoConsent();
+            game.consentVetoRequest(game.president, 'yes');
+            checkForAcceptConsent(game, initialDiscardLength, vetoedPolicies);
+            
+            [game, initialDiscardLength, vetoedPolicies] = setupGameForVetoConsent();
+            game.consentVetoRequest(game.president, 'Y');
+            checkForAcceptConsent(game, initialDiscardLength, vetoedPolicies);
+            
+            [game, initialDiscardLength, vetoedPolicies] = setupGameForVetoConsent();
+            game.consentVetoRequest(game.president, 'y');
+            checkForAcceptConsent(game, initialDiscardLength, vetoedPolicies);
+            
+            [game, initialDiscardLength, vetoedPolicies] = setupGameForVetoConsent();
+            game.consentVetoRequest(game.president, 'nein');
+            checkForRejectConsent(game, initialDiscardLength, vetoedPolicies);
+            
+            [game, initialDiscardLength, vetoedPolicies] = setupGameForVetoConsent();
+            game.consentVetoRequest(game.president, 'NeIN');
+            checkForRejectConsent(game, initialDiscardLength, vetoedPolicies);
+            
+            [game, initialDiscardLength, vetoedPolicies] = setupGameForVetoConsent();
+            game.consentVetoRequest(game.president, 'no');
+            checkForRejectConsent(game, initialDiscardLength, vetoedPolicies);
+            
+            [game, initialDiscardLength, vetoedPolicies] = setupGameForVetoConsent();
+            game.consentVetoRequest(game.president, 'N');
+            checkForRejectConsent(game, initialDiscardLength, vetoedPolicies);
+            
+            [game, initialDiscardLength, vetoedPolicies] = setupGameForVetoConsent();
+            game.consentVetoRequest(game.president, 'n');
+            checkForRejectConsent(game, initialDiscardLength, vetoedPolicies);
+        });
+    });
+    
     describe('President assignment tests', () => {
+        it('Should only assign a random president if the state is AssignPresident', () => {
+            const game = new Game(client);
+            game.startGame(null, message);
+            game.setState(Game.GameStates.NominateChancellor);
+            game.president = null;
+            
+            sinon.spy(game, 'setState');
+            
+            game.assignRandomPresident();
+            
+            should.not.exist(game.president);
+            game.gameState.should.equal(Game.GameStates.NominateChancellor);
+            game.setState.should.have.not.been.called;
+        });
+        
         it('Should assign a random president', () => {
             const game = new Game(client);
             game.startGame(null, message);
@@ -661,6 +852,21 @@ describe('Tests for the game logic', () => {
             game.president.id.should.equal(game.players[game.presidentIndex].id);
             game.gameState.should.equal(Game.GameStates.NominateChancellor);
             game.setState.should.have.been.calledOnce;
+        });
+        
+        it('Should only assign the next president if the state is AssignPresident', () => {
+            const game = new Game(client);
+            game.startGame(null, message);
+            game.setState(Game.GameStates.NominateChancellor);
+            const initialPresidentId = game.president.id;
+            
+            sinon.spy(game, 'setState');
+            
+            game.assignNextPresident();
+            
+            game.president.id.should.equal(initialPresidentId);
+            game.gameState.should.equal(Game.GameStates.NominateChancellor);
+            game.setState.should.have.not.been.called;
         });
         
         it('Should assign the next player as president', () => {
@@ -1210,7 +1416,6 @@ describe('Tests for the game logic', () => {
         it('Should win if 6 facist policies are enacted', () => {
             const game = new Game(client);            
             game.startGame(null, message);
-            game.gameBoard.facistPolicies = 5;
             
             for(var i = 0; i < 5; i++) {
                 game.enactPolicy(Game.Policies.Facist);
@@ -1218,7 +1423,7 @@ describe('Tests for the game logic', () => {
             
             game.doFacistsWin().should.be.false;
             game.facistsWon.should.be.false;
-            game.gameBoard.facistPolicies.length.should.equal(5);
+            game.gameBoard.NumOfFacistPolicies.should.equal(5);
             
             game.enactPolicy(Game.Policies.Facist);
             
@@ -1241,7 +1446,7 @@ describe('Tests for the game logic', () => {
             }
             
             game.facistsWon.should.be.false;
-            game.gameBoard.facistPolicies.length.should.equal(2);
+            game.gameBoard.NumOfFacistPolicies.should.equal(3);
             
             game.nominatedChancellor = hitler;
             game.electChancellor();
@@ -1269,12 +1474,55 @@ describe('Tests for the game logic', () => {
             game.electChancellor();
             
             game.facistsWon.should.be.false;
-            game.gameBoard.facistPolicies.length.should.equal(2);
+            game.gameBoard.NumOfFacistPolicies.should.equal(2);
+            game.chancellor.isHitler.should.be.true;
             
             game.enactPolicy(Game.Policies.Facist);
             
             game.facistsWon.should.be.false;
             game.gameRunning.should.be.true;
+        });
+    });
+
+    describe('Semi end-to-end Liberal win condition tests', () => {
+        it('Should win if 5 liberal policies enacted', () => {
+            const game = new Game(client);            
+            game.startGame(null, message);
+            
+            for(var i = 0; i < 4; i++) {
+                game.enactPolicy(Game.Policies.Liberal);
+            }
+            
+            game.liberalsWon.should.be.false;
+            game.gameRunning.should.be.true;
+            game.gameBoard.NumOfLiberalPolicies.should.equal(4);
+            
+            game.enactPolicy(Game.Policies.Liberal);
+            
+            game.liberalsWon.should.be.true;
+            game.gameRunning.should.be.false;
+            game.gameState.should.equal(Game.GameStates.Finished);
+        });
+        
+        it('Should win if hitler is killed', () => {
+            const game = new Game(client);            
+            game.startGame(null, message);                
+            //const hitler = game.players.find(p => p.isHitler);
+            
+            for(var i = 0; i < 4; i++) {
+                game.enactPolicy(Game.Policies.Facist);
+            }
+            
+            game.president = game.players.find(p => !p.isHitler);
+            game.president.isHitler.should.not.be.true;
+            
+            game.gameState.should.equal(Game.GameStates.PresidentShootPlayer);
+            game.shootPlayer(game.president, createDiscordUserId(game.hitler.id));
+            
+            game.hitler.isDead.should.be.true;
+            game.liberalsWon.should.be.true;
+            game.gameRunning.should.be.false;
+            game.gameState.should.equal(Game.GameStates.Finished);
         });
     });
 });

@@ -273,7 +273,7 @@ class Game {
         if (!this.checkState(Game.GameStates.AssignPresident)) return;
         let notice = '';
         
-        if (this.previousPresidentIndex && this.speciallyElectedPresident) {
+        if (this.previousPresidentIndex !== null && this.speciallyElectedPresident) {
             notice += `Returning to previous president order prior to the Special Election...\n`;
             this.presidentIndex = this.previousPresidentIndex;
             this.previousPresidentIndex = null;
@@ -479,7 +479,7 @@ class Game {
     }
     
     vetoPolicies(author) {
-        if (!checkState(Game.GameStates.ChancellorDiscardPolicy)) return;
+        if (!this.checkState(Game.GameStates.ChancellorDiscardPolicy)) return;
         if (this.chancellorRequestedVeto) return;
         
         const player = this.findPlayer(author.id);
@@ -491,7 +491,7 @@ class Game {
     }
     
     consentVetoRequest(author, consent) {
-        if (!checkState(Game.GameStates.ChancellorVetoRequested)) return;
+        if (!this.checkState(Game.GameStates.ChancellorVetoRequested)) return;
         
         consent = consent.toLowerCase();
         const player = this.findPlayer(author.id);
@@ -499,6 +499,8 @@ class Game {
             if (consent === 'nein' || consent === 'n' || consent === 'no') {
                 this.setState(Game.GameStates.ChancellorDiscardPolicy);
             } else if (consent === 'ja' || consent === 'j' || consent === 'y' || consent === 'yes') {
+                this.discardPile = this.discardPile.concat(this.drawnPolicies);
+                this.drawnPolicies = [];
                 this.gameBoard.increaseElectionTracker();
                 this.setState(Game.GameStates.AssignPresident);
                 this.assignNextPresident();
@@ -651,7 +653,7 @@ class Game {
         }
     }
     
-    doFacistsWin(justElected = false) {
+    doFacistsWin(justElected = false) {        
         if (this.gameBoard.NumOfFacistPolicies === 6) {
             const msg = `6 Facist policies enacted!\n{this.hitler.nickname} and his facists win!`;
             this.sendMessageLine(msg);

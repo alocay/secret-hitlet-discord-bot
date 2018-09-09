@@ -23,32 +23,36 @@ class Membership {
     }
     
     static GetRoleString(role) {
+        let roleString = '';
+        
         switch(role) {
             case Membership.Roles.Liberal:
-                return 'Liberal';
+                roleString = 'Liberal';
                 break;
             case Membership.Roles.Facist:
-                return 'Facist';
+                roleString = 'Facist';
                 break;
             case Membership.Roles.Hitler:
-                return 'Hitler'
+                roleString = 'Hitler'
                 break;
         }
         
-        return '';
+        return roleString;
     }
     
     static GetPartyString(party) {
+        let partyString = '';
+        
         switch(party) {
             case Membership.Parties.Liberal:
-                return 'Liberal';
+                partyString = 'Liberal';
                 break;
             case Membership.Parties.Facist:
-                return 'Facist';
+                partyString = 'Facist';
                 break;
         }
         
-        return '';
+        return partyString;
     }
     
     static CreateLiberal() {
