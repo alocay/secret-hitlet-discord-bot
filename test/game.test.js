@@ -99,6 +99,7 @@ describe('Tests for the game logic', () => {
         
         game.startGame(null, message);
         
+        game.gameChannel.should.exist;
         game.gameRunning.should.be.true;
         
         game.gameBoard.should.exist;
@@ -126,6 +127,32 @@ describe('Tests for the game logic', () => {
         game.gameState.should.equal(Game.GameStates.NominateChancellor);
         
         game.setState.callCount.should.equal(3);
+    });
+    
+    it('Should not start a game if one is already started', () => {
+        const game = new Game(client);
+        game.startGame(null, message);
+        
+        sinon.spy(game, 'setState');
+        sinon.spy(game, 'findUsersPlaying');
+        
+        game.startGame(null, message);
+        
+        game.gameRunning.should.be.true;
+        game.setState.should.not.have.been.called;
+        game.findUsersPlaying.should.not.have.been.called;
+    });
+    
+    it('Should not start the game if there is not client reference', () => {
+        const game = new Game();        
+        sinon.spy(game, 'setState');
+        sinon.spy(game, 'findUsersPlaying');
+        
+        game.startGame(null, message);
+        
+        game.gameRunning.should.be.false;
+        game.setState.should.not.have.been.called;
+        game.findUsersPlaying.should.not.have.been.called;
     });
     
     describe('Chancellor nomination tests', () => {

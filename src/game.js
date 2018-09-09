@@ -68,7 +68,7 @@ class Game {
     }
 
 	log(msg) {
-		if (!this.client.isMock) {
+		if (this.client && !this.client.isMock) {
 			console.log(msg);
 		}
 	}
