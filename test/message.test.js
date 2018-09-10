@@ -8,15 +8,17 @@ const should = chai.should();
 describe('Tests for embedded message', () => {
     const mockAuthor = 'mock author';
     const mockTitle = 'mock title';
+    const mockDescription = 'mock description';
     const mockColor = 'red';
     const mockHeader = 'mock header';
     const mockValue = 'mock value';
+    const mockPath = 'path/to/thumbnail';
     
     it('Should create an embedded message', () => {
         const embedMsgNoParameters = new EmbeddedMessage();
         const embedMsgNoTitle = new EmbeddedMessage(mockAuthor);
         const embedMsgNoColor = new EmbeddedMessage(mockAuthor, mockTitle);
-        const embedMsg = new EmbeddedMessage(mockAuthor, mockTitle, mockColor);
+        const embedMsg = new EmbeddedMessage(mockAuthor, mockTitle, mockDescription, mockColor);
         
         should.not.exist(embedMsgNoParameters.title);
         should.not.exist(embedMsgNoParameters.author);        
@@ -36,7 +38,7 @@ describe('Tests for embedded message', () => {
     });
     
     it('Should add lines', () => {
-        const embedMsg = new EmbeddedMessage(mockAuthor, mockTitle, mockColor);
+        const embedMsg = new EmbeddedMessage(mockAuthor, mockTitle, mockDescription, mockColor);
         
         embedMsg.lines.should.be.empty;
         
@@ -49,5 +51,13 @@ describe('Tests for embedded message', () => {
             l.header.should.equal(mockHeader);
             l.value.should.equal(mockValue);
         });
+    });
+    
+    it('Should add a thumbnail', () => {
+        const embedMsg = new EmbeddedMessage(mockAuthor, mockTitle, mockDescription, mockColor);        
+        should.not.exist(embedMsg.thumbnail);
+        
+        embedMsg.addThumbnail(mockPath);        
+        embedMsg.thumbnail.should.equal(mockPath);
     });
 });

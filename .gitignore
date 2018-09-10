@@ -1,6 +1,7 @@
 # Ignored files #
 #################
 config.json
+src/assets/
 
 # Code Coverage #
 #################

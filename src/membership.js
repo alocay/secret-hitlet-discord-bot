@@ -55,6 +55,39 @@ class Membership {
         return partyString;
     }
     
+    static GetPartyColor(party) {
+        let color = null;
+        
+        switch(party) {
+            case Membership.Parties.Liberal:
+                color = 'BLUE';
+                break;
+            case Membership.Parties.Facist:
+                color = 'RED';
+                break;
+        }
+        
+        return color;
+    }
+    
+    static GetRoleThumbnail(role) {
+        let thumbnail = null;
+        
+        switch(role) {
+            case Membership.Roles.Liberal:
+                thumbnail = 'https://i.imgur.com/jKCjkPj.png';
+                break;
+            case Membership.Roles.Facist:
+                thumbnail = 'https://i.imgur.com/cchoOFd.png';
+                break;
+            case Membership.Roles.Hitler:
+                thumbnail = 'https://i.imgur.com/9vVwdqY.png'
+                break;
+        }
+        
+        return thumbnail;
+    }
+    
     static CreateLiberal() {
         return new Membership(Membership.Parties.Liberal, Membership.Roles.Liberal);
     }

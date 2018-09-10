@@ -1,8 +1,10 @@
 'use strict';
 
+import Discord from 'discord.js';
 import Gameboard from './gameboard.js';
 import Player from './player.js';
 import Membership from './membership.js';
+import EmbeddedMessage from './message.js';
 const { cmd_channel } = require('./config.json');
 
 const FacistPolicies = 11;
@@ -27,6 +29,22 @@ const getRandomInt = function getRandomInt(max) {
 
 const extractUserId = function extractUserId(callout) {
     return callout.replace(/[<@!>]/g, '');
+};
+
+const createEmbeddedMessage = function createEmbeddedMessage(message) {
+    const embed = new Discord.RichEmbed()
+        .setTitle(message.title)
+        .setAuthor(message.author)
+        .setDescription(message.description)
+        .setColor(message.color)
+        .setThumbnail(message.thumbnail)
+        .setTimestamp();
+    
+    message.lines.forEach(l => {
+        embed.addField(l.header, l.value)
+    });
+    
+    return embed;
 };
 
 class Game {
@@ -249,7 +267,8 @@ class Game {
         
         for(var i = 0; i < this.players.length; i++) {
             const player = this.players[i];
-            player.user.send(player.getFullMembershipInfo(this.hitler, this.facists, this.doesHitlerKnowFacists));
+            const embeddedMsg = createEmbeddedMessage(player.getFullMembershipInfo(this.hitler, this.facists, this.doesHitlerKnowFacists));
+            player.user.send(embeddedMsg);
         }        
         
         this.sendMessageLine('Dealing party/role cards...\nPlease check your DM for your party and role assignement!\n');
