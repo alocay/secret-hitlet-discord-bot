@@ -7,7 +7,7 @@ class Player {
     constructor(user) {
         this.user = user;
         this.id = user.id;
-        this.nickname = user.nickname;
+        this.nickname = user.username;
         this.membership = null;
         this.isChancellor = false;
         this.isPresident = false;

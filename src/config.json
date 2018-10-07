@@ -1,5 +1,10 @@
 {
-    "prefix": "!",
+    "defaultSettings": {
+        "prefix": "!",
+        "gameCmdChannelName": "game_room",
+        "gameCmdChannelId": null
+    },
+    
     "token": "",
-    "cmd_channel": "485971406731870208"
+    "hardCodedPrefix": "shb!!"
 }

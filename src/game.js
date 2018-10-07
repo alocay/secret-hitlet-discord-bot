@@ -5,11 +5,11 @@ import Gameboard from './gameboard.js';
 import Player from './player.js';
 import Membership from './membership.js';
 import EmbeddedMessage from './message.js';
-const { cmd_channel } = require('./config.json');
 
 const FacistPolicies = 11;
 const LiberalPolicies = 7;
 const MaxPlayers = 10;
+const MinPlayers = 2;
 
 const shuffle = function shuffle(a) {
     var j, x, i;
@@ -48,8 +48,8 @@ const createEmbeddedMessage = function createEmbeddedMessage(message) {
 };
 
 class Game {
-    constructor(client) {
-        this.client = client;
+    constructor(guild, gameCmdChannelId) {
+        this.guild = guild;
         this.gameState = null;
         this.deck = [];
         this.membershipDeck = [];
@@ -77,16 +77,18 @@ class Game {
         this.investigatedPlayers = [];
         this.facistsWon = false;
         this.liberalsWon = false;
+        this.preEndConfirmState = null;
+        this.gameChannelId = gameCmdChannelId;
         
-        if (this.client) {
-            this.gameChannel = this.client.channels.get(cmd_channel);
+        if (this.guild) {
+            this.gameChannel = this.guild.channels.get(gameCmdChannelId);
         } else {
             this.log('Client object not provided - cannot initialize');
         }
     }
 
 	log(msg) {
-		if (this.client && !this.client.isMock) {
+		if (this.guild && !this.guild.isMock) {
 			console.log(msg);
 		}
 	}
@@ -97,12 +99,12 @@ class Game {
     
     sendMessage(msg) {
         if (!this.gameChannel) {
-            if (!this.client) { 
+            if (!this.guild) { 
                 this.log('Cannot get game channel when sending message - no client object');
                 return;
             }
             
-            this.gameChannel = this.client.channels.get(cmd_channel);
+            this.gameChannel = this.guild.channels.get(this.gameChannelId);
         }
         
         this.gameChannel.send(msg);
@@ -110,6 +112,18 @@ class Game {
     
     findPlayer(id) {
         return this.players.find(p => p.id === id);
+    }
+    
+    findPlayerByName(name) {
+        return this.players.find(p => p.nickname.toLowerCase().incldues(name.toLowerCase()));
+    }
+    
+    findPlayerByArg(playerArg) {
+        if (playerArg.includes('@')) {
+            return this.findPlayer(extractUserId(playerArg));
+        } else {
+            return this.findPlayerByName(playerArg);
+        }
     }
     
     getDrawnPolicyInfo() {
@@ -128,8 +142,8 @@ class Game {
         let msg = 'The following are the top 3 policies:\n\n';
         
         const peekedPolicies = this.deck.slice(0, 3);
-        if (this.client.test_peekedPolicies) {
-            this.client.test_peekedPolicies = peekedPolicies.concat([]);
+        if (this.guild.test_peekedPolicies) {
+            this.guild.test_peekedPolicies = peekedPolicies.concat([]);
         }
         
         for (var i = 0; i < peekedPolicies.length; i++) {
@@ -139,22 +153,54 @@ class Game {
         return msg;
     }
     
-    getUsersFromIds(playerIds) {
+    getUsers(players) {
         let users = [];
-        for(var i = 0; i < playerIds.length; i++) {
-            const user = this.client.users.get(playerIds[i]);
+        let usersNotFound = 0;
+        
+        for(var i = 0; i < players.length; i++) {
+            const player = players[i];
+            let user = null;
             
-            if (!user) continue;
+            if (player.includes('@')) {
+                user = getUserFromId(player);
+            } else {
+                user = getUserFromName(player);
+            }
+            
+            if (!user) {
+                usersNotFound++;
+                continue;
+            }
             
             users.push(user);
+        }
+        
+        if (usersNotFound > 0) {
+            this.sendMessageLine(`There were ${usersNotFound} that could not be found.`);
         }
         
         return users;
     }
     
+    getUserFromName(playerName) {
+        return this.guild.members.find(m => m.username.toLowerCase().includes(playerName.toLowerCase()));
+    }
+    
+    getUserFromId(playerIds) {
+        const playerId = extractUserId(player);
+        return this.guild.members.get(playerId);
+    }
+    
     getAllUsersInAuthorsChannel(author) {
         var voiceChannelId = author.lastMessage.member.voiceChannelID;
-        var voiceChannel = this.client.channels.get(voiceChannelId);
+        
+        if(!voiceChannelId) {
+            this.sendMessageLine(`User ${author.username} is not in a voice channel - join a voice channel and start again.`);
+            return null;
+        }
+        
+        var voiceChannel = this.guild.channels.get(voiceChannelId);
+        
         return voiceChannel.members.map(u => u);
         
         /*const mem = vc.members.map(x => x.nickname);    
@@ -338,7 +384,7 @@ class Game {
         if (!this.checkState(Game.GameStates.NominateChancellor)) return;
         
         if (author.id === this.president.id) {
-            const player = this.findPlayer(extractUserId(nominated));
+            const player = this.findPlayerByArg(nominated);
             
 			if (!player) return;
             
@@ -598,7 +644,7 @@ class Game {
         if (!this.checkState(Game.GameStates.PresidentInvestigatePlayer)) return;
         
         if (author.id === this.president.id) {
-            const player = this.findPlayer(extractUserId(user));
+            const player = this.findPlayerByArg(user);
             const hasBeenInvestigated = this.investigatedPlayers.find(pid => pid === player.id);
             
             if (hasBeenInvestigated) {
@@ -625,7 +671,7 @@ class Game {
         if (!this.checkState(Game.GameStates.SpeciallyElectPresident)) return;
         
         if (author.id === this.president.id) {
-            const player = this.findPlayer(extractUserId(newPres));
+            const player = this.findPlayerByArg(newPres);
             
             if (player.isDead) {
                 this.sendMessageLine(`${player.nickname} is dead and cannot be chosen as President`);
@@ -649,7 +695,7 @@ class Game {
         if (!this.checkState(Game.GameStates.PresidentShootPlayer)) return;
         
         if (author.id === this.president.id) {
-            const player = this.findPlayer(extractUserId(user));
+            const player = this.findPlayerByArg(user);
             
             if (player.isDead) {
                 this.sendMessageLine(`${player.nickname} has already been executed and cannot be made more dead`);
@@ -718,9 +764,19 @@ class Game {
             foundPlayers = this.getAllUsersInAuthorsChannel(author);
         } else {
             const playersArray = players.split(" ");
-            const playerIds = playersArray.map(u => extractUserId(u));
-            foundPlayers = this.getUsersFromIds(playerIds);
+            foundPlayers = this.getUsers(playersArray);
         }
+        
+        if (!foundPlayers) {
+            return null;
+        }
+        
+        if (foundPlayers.length < MinPlayers) {
+            this.sendMessageLine(`Not enough players found. A minimum of 5 players are required and only ${foundPlayers.length} were found.`);
+            return null;
+        }
+        
+        console.log(foundPlayers);
         
         let notice = '';        
         if (foundPlayers.length > 10) {
@@ -729,7 +785,8 @@ class Game {
         }
         
         for(var i = 0; i < foundPlayers.length; i++) {
-            this.players.push(new Player(foundPlayers[i]));
+            console.log(foundPlayers[i].user);
+            this.players.push(new Player(foundPlayers[i].user));
         }
         
         this.doesHitlerKnowFacists = this.players.length <= 6;
@@ -741,10 +798,11 @@ class Game {
         }
         
         this.sendMessageLine(notice);
+        return true;
     }
     
     startGame(players, message) {
-        if (!this.client) {
+        if (!this.guild) {
             message.channel.send('Game was not properly initialized!');
             return;
         }
@@ -758,7 +816,13 @@ class Game {
         this.setState(Game.GameStates.Setup);
         this.sendMessageLine('Starting a new game of Secret Hitler!\n--------------------------------------\n');
         
-        this.findUsersPlaying(message.author, players);
+        this.resetGameDecks();
+        
+        if (!this.findUsersPlaying(message.author, players)) {
+            this.gameRunning = false;
+            this.setState(Game.GameStates.Finished);
+            return;
+        }
         
         this.createGameboard();
         this.createMemberships();
@@ -768,6 +832,12 @@ class Game {
     
         this.setState(Game.GameStates.AssignPresident);
         this.assignRandomPresident();
+    }
+    
+    resetGameDecks() {
+        this.players = [];
+        this.membershipDeck = [];
+        this.deck = [];
     }
     
     showGameStateInfo() {
@@ -790,73 +860,106 @@ class Game {
         this.sendMessageLine(info);
     }
     
+    endGame(author, confirm) {
+        if (!this.gameRunning || this.checkState(Game.GameStates.Finished)) return;
+        
+        if (!this.checkState(Game.GameStates.ConfirmEndGame)) {
+            this.preEndConfirmState = this.gameState;
+            this.setState(Game.GameStates.ConfirmEndGame);
+            this.sendMessageLine('Are you sure you want to end the current game? Confirm using !end y or !end n');
+            return;
+        } else {
+            if (!confirm) return;
+            
+            confirm = confirm.toLowerCase();
+            if (confirm === 'nein' || confirm === 'n' || confirm === 'no') {
+                this.setState(this.preEndConfirmState);
+                this.sendMessageLine('Continuing game...');
+            } else if (confirm === 'ja' || confirm === 'j' || confirm === 'y' || confirm === 'yes') {
+                this.sendMessageLine('Ending game... Thanks for playing!');
+                this.gameRunning = false;
+                this.setState(Game.GameStates.Finished);
+            } else {
+                return;
+            }
+            
+            this.preEndConfirmState = null;
+        }
+    }
+    
     static get Commands() {
         return [
             {
                 name: 'play',
-                alias: 'start',
+                alias: ['start', 'pl'],
                 description: 'Starts a new game',
-                usage: '!play <optional list of players>',
-                example: '!play or !play @Squid#3288, @vagen#5010',
+                usage: 'play <optional list of players>',
+                example: 'play or !play @Squid#3288, @vagen#5010',
                 action: 'startGame'
             },
             {
                 name: 'nominate',
                 description: 'Nominate a player as chancellor',
-                usage: '!nominate <player>',
-                example: '!nominate @Squid#3288',
+                usage: 'nominate <player>',
+                example: 'nominate @Squid#3288',
                 action: 'nominateChancellor'            
             },
             {
                 name: 'vote',
                 description: 'Votes on the current election',
-                usage: '!vote <ja,nein>',
+                usage: 'vote <ja,nein>',
                 action: 'voteOnNomination'            
             },
             {
                 name: 'draw',
                 description: 'Draws three policy cards',
-                usage: '!draw',
+                usage: 'draw',
                 action: 'drawPolicies'            
             },
             {
                 name: 'discard',
                 description: 'Discards the specified card',
-                usage: '!discard <card # to discard>',
-                usage: '!discard 1',
+                usage: 'discard <card # to discard>',
+                usage: 'discard 1',
                 action: 'discardPolicy'            
             },
             {
                 name: 'elect',
                 description: 'Elects a specially elected president (when applicable)',
-                usage: '!elect <player>',
-                example: '!nominate @Squid#3288',
+                usage: 'elect <player>',
+                example: 'elect @Squid#3288',
                 action: 'speciallyElectPresident'
             },
             {
                 name: 'shoot',
                 description: 'Shoots the specified player (when applicable)',
-                usage: '!shoot <player>',
-                example: '!shoot @Squid#3288',
+                usage: 'shoot <player>',
+                example: 'shoot @Squid#3288',
                 action: 'shootPlayer'            
             },
             {
                 name: 'veto',
                 description: 'Initates a veto of the current policies (when applicable)',
-                usage: '!veto',
+                usage: 'veto',
                 action: 'vetoPolicies'            
             },
             {
                 name: 'consent',
                 description: 'Consents or denies to a requested veto (when applicable)',
-                usage: '!consent <ja|nein>',
+                usage: 'consent <ja|nein>',
                 action: 'consentVetoRequest'            
             },
             {
                 name: 'info',
                 description: 'Displays the status of enacted policies, number of policy cards left, current Election Tracker status, current government, and any dead players',
-                usage: '!info',
+                usage: 'info',
                 action: 'showGameStateInfo'            
+            },
+            {
+                name: 'end',
+                description: 'Ends the current game (requires confirmation)',
+                usage: 'end',
+                action: 'endGame'
             },
         ];
     }
@@ -878,7 +981,8 @@ class Game {
             PresidentInvestigatePlayer: 12,
             PresidentExecution: 13,
             ChancellorVetoRequested: 14,
-            Finished: 15
+            ConfirmEndGame: 15,
+            Finished: 16
         };
     }
     

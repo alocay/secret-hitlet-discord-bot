@@ -13,7 +13,11 @@
   "author": "Armando Locay",
   "license": "MIT",
   "dependencies": {
-    "discord.js": "^11.3.2"
+    "better-sqlite-pool": "^0.1.2",
+    "discord.js": "^11.3.2",
+    "enmap": "^4.3.2",
+    "express": "^4.16.3",
+    "simple-oauth2": "^2.2.1"
   },
   "devDependencies": {
     "@babel/preset-env": "^7.0.0",
@@ -23,6 +27,7 @@
     "babel-preset-env": "^1.7.0",
     "babel-preset-es2015": "^6.24.1",
     "chai": "^4.1.2",
+    "forever": "^0.15.3",
     "mocha": "^5.2.0",
     "nyc": "^13.0.1",
     "sinon": "^6.2.0",
