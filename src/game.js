@@ -162,9 +162,9 @@ class Game {
             let user = null;
             
             if (player.includes('@')) {
-                user = getUserFromId(player);
+                user = this.getUserFromId(player);
             } else {
-                user = getUserFromName(player);
+                user = this.getUserFromName(player);
             }
             
             if (!user) {
@@ -183,12 +183,18 @@ class Game {
     }
     
     getUserFromName(playerName) {
-        return this.guild.members.find(m => m.username.toLowerCase().includes(playerName.toLowerCase()));
+        return this.guild.members.find(m => {
+            const name = m.nickname ? m.nickname : m.user.username;
+            const isOnline = m.user.presence.status == 'online';
+            return !m.user.bot && isOnline && name.toLowerCase().includes(playerName.toLowerCase());
+        });
     }
     
     getUserFromId(playerIds) {
         const playerId = extractUserId(player);
-        return this.guild.members.get(playerId);
+        const user = this.guild.members.get(playerId);
+        
+        return !user.user.bot ? user : null;
     }
     
     getAllUsersInAuthorsChannel(author) {
@@ -201,11 +207,7 @@ class Game {
         
         var voiceChannel = this.guild.channels.get(voiceChannelId);
         
-        return voiceChannel.members.map(u => u);
-        
-        /*const mem = vc.members.map(x => x.nickname);    
-        mem.unshift('Members:\n');
-        mem.join('');*/
+        return voiceChannel.members.map(u => u).filter(u => !u.user.bot);
     }
     
     validatePolicyNumber(policy) {
