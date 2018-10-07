@@ -1,5 +1,39 @@
 "use strict";
 
+const GameboardVisuals = {
+    "facist5_6": [
+        "https://i.imgur.com/7omhO5Jl.png",
+        "https://i.imgur.com/ztIx9Ocl.png",
+        "https://i.imgur.com/17KMpN4l.png",
+        "https://i.imgur.com/agdxUvql.png",
+        "https://i.imgur.com/Ir0yEsp.png",
+        "https://i.imgur.com/HJc4upq.png"
+    ],
+    "facist7_8": [
+        "https://i.imgur.com/T0Z3gkwl.png",
+        "https://i.imgur.com/s6stk9el.png",
+        "https://i.imgur.com/0bEt2Dxl.png",
+        "https://i.imgur.com/Y4x1Zfvl.png",
+        "https://i.imgur.com/KwPjqJLl.png",
+        "https://i.imgur.com/ZUqiKTFl.png"
+    ],
+    "facist9_10": [
+        "https://i.imgur.com/NfWbBTm.png",
+        "https://i.imgur.com/4KWbg03.png",
+        "https://i.imgur.com/0vc1Uuv.png",
+        "https://i.imgur.com/ONdxw2A.png",
+        "https://i.imgur.com/G1qWdfB.png",
+        "https://i.imgur.com/FlZTOLp.png"
+    ],
+    "liberal": [
+        "https://i.imgur.com/Ve9Epa6.png",
+        "https://i.imgur.com/UqqqgQV.png",
+        "https://i.imgur.com/9jeV1Bp.png",
+        "https://i.imgur.com/H516JHw.png",
+        "https://i.imgur.com/ZBPzI3W.png"
+    ]
+}
+
 class Gameboard {
     constructor(numOfPlayers) 
     {
@@ -76,6 +110,26 @@ class Gameboard {
         info += `Liberal Policies: ${this.liberalPolicies}\n`;
         info += `Rejected Govts: ${this.govtRejectCount} (policy enacted at 3)\n\n`;
         return info;
+    }
+    
+    getFacistBoardVisual() {
+        if (this.facistPolicies < 0 || this.facistPolicies > 5) return null;
+        
+        if (numOfPlayers <= 6) {
+            return GameboardVisuals.facist5_6[this.facistPolicies];
+        } else if (numOfPlayers <= 8) {
+            return GameboardVisuals.facist7_8[this.facistPolicies];
+        } else if (numOfPlayers <= 10) {
+            return GameboardVisuals.facist9_10[this.facistPolicies];
+        }
+        
+        return null;
+    }
+    
+    getLiberalBoardVisual() {
+        if (this.liberalPolicies < 0 || this.liberalPolicies > 4) return null;
+        
+        return GameboardVisuals.liberal[this.liberalPolicies];
     }
     
     get NumOfFacistPolicies() {

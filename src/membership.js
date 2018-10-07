@@ -1,5 +1,9 @@
 "use strict";
 
+const HitlerRoleCard = "https://i.imgur.com/9vVwdqY.png";
+const FacistRoleCard = "https://i.imgur.com/cchoOFd.png";
+const LiberalRoleCard = "https://i.imgur.com/jKCjkPj.png";
+
 class Membership {
     constructor(party, role) 
     {
@@ -75,13 +79,13 @@ class Membership {
         
         switch(role) {
             case Membership.Roles.Liberal:
-                thumbnail = 'https://i.imgur.com/jKCjkPj.png';
+                thumbnail = LiberalRoleCard;
                 break;
             case Membership.Roles.Facist:
-                thumbnail = 'https://i.imgur.com/cchoOFd.png';
+                thumbnail = FacistRoleCard;
                 break;
             case Membership.Roles.Hitler:
-                thumbnail = 'https://i.imgur.com/9vVwdqY.png'
+                thumbnail = HitlerRoleCard;
                 break;
         }
         

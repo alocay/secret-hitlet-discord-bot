@@ -9,7 +9,10 @@ import EmbeddedMessage from './message.js';
 const FacistPolicies = 11;
 const LiberalPolicies = 7;
 const MaxPlayers = 10;
-const MinPlayers = 2;
+const MinPlayers = 5;
+
+const FacistLogo = "https://i.imgur.com/njhfcwE.png";
+const LiberalLogo = "https://i.imgur.com/5uBH2Qp.png";
 
 const shuffle = function shuffle(a) {
     var j, x, i;
@@ -110,6 +113,38 @@ class Game {
         this.gameChannel.send(msg);
     }
     
+    sendGameboardEmbeds(facistBoard, liberalBoard, text) {
+        if (!this.gameChannel) {
+            if (!this.guild) { 
+                this.log('Cannot get game channel when sending message - no client object');
+                return;
+            }
+            
+            this.gameChannel = this.guild.channels.get(this.gameChannelId);
+        }
+        
+        // Send them one after the other
+        const that = this;
+        this.gameChannel.send(facistBoard)
+            .then(msg => {
+                that.gameChannel.send(liberalBoard)
+                    .then(msg => {
+                        that.gameChannel.send(text);
+                });
+        });
+    }
+    
+    sendGameboardVisualDisplay() {
+        const gameBoardElements = this.getVisualGameboardDisplay();
+        const gameBoardText = this.gameBoard.getGameboardDisplay();
+        
+        if (!gameBoardElements) {
+            this.sendMessageLine(gameBoardText);
+        } else {
+            this.sendGameboardEmbeds(gameBoardElements[0], gameBoardElements[1], gameBoardText);
+        }
+    }
+    
     findPlayer(id) {
         return this.players.find(p => p.id === id);
     }
@@ -208,6 +243,22 @@ class Game {
         var voiceChannel = this.guild.channels.get(voiceChannelId);
         
         return voiceChannel.members.map(u => u).filter(u => !u.user.bot);
+    }
+    
+    getVisualGameboardDisplay() {
+        const facistBoardVisual = this.gameBoard.getFacistBoardVisual();
+        const liberalBoardVisual = this.gameBoard.getLiberalBoardVisual();
+        
+        const facistBoardEmbed = new Discord.RichEmbed()
+            .setColor(12411490)
+            .setImage(facistBoardVisual);
+            
+        const liberalBoardEmbed = new Discord.RichEmbed()
+            .setColor(6921935)
+            .setTimestamp()
+            .setImage(liberalBoardVisual);
+        
+        return [facistBoardEmbed, liberalBoardEmbed];
     }
     
     validatePolicyNumber(policy) {
@@ -326,7 +377,7 @@ class Game {
         this.log('Assigning random president...');
         if (!this.checkState(Game.GameStates.AssignPresident)) return;
         
-        this.presidentIndex = getRandomInt(this.players.length);
+        this.presidentIndex = getRandomInt(this.players.length);        
         this.president = this.players[this.presidentIndex];
         this.channcelorIndex = null;
         this.chancellor =  null;
@@ -586,7 +637,7 @@ class Game {
             this.gameBoard.enactLiberalPolicy();
         }
         
-        this.sendMessageLine(this.gameBoard.getGameboardDisplay());
+        this.sendGameboardVisualDisplay();
         
         this.log('checking win conditions...');
         if (this.doFacistsWin() || this.doLiberalsWin()) {
@@ -778,8 +829,6 @@ class Game {
             return null;
         }
         
-        console.log(foundPlayers);
-        
         let notice = '';        
         if (foundPlayers.length > 10) {
             notice += 'Found more than 10 possible players, using the first 10 found.\n';
@@ -787,7 +836,6 @@ class Game {
         }
         
         for(var i = 0; i < foundPlayers.length; i++) {
-            console.log(foundPlayers[i].user);
             this.players.push(new Player(foundPlayers[i].user));
         }
         
@@ -848,7 +896,7 @@ class Game {
         info += this.gameBoard.getGameboardDisplay();
         info += `Policy cards left: ${this.deck.length}\n\n`;
         
-        info += `President: ${this.president.nickname}\n`;
+        info += `President: ${this.president ? this.president.nickname : 'None'}\n`;
         info += `Chancellor: ${this.chancellor ? this.chancellor.nickname : 'None'}\n\n`;
         
         if (this.players.some(p => p.isDead)) {
