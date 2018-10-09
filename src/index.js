@@ -24,28 +24,30 @@ bot.settings = new Enmap({
 
 const NonGameCommands = new Discord.Collection([
     ['setPrefixCmd', {
-        name: 'setprefix',
+        name: 'prefix',
         description: 'Sets the command prefix (default is !)',
-        usage: 'setprefix <characters>',
+        usage: 'prefix <characters>',
         action: setPrefixCharacter
     }],
     ['setChannelCmd', {
-        name: 'setchannel',
+        name: 'channel',
         description: 'sets which text channel should be used',
-        usage: 'setchannel <channel name or ID>',
+        usage: 'channel <channel name or ID>',
         action: setCmdChannel
     }],
     ['toggleBoardVisuals', {
         name: 'visuals',
         description: 'toggles the gameboard visuals',
         usage: 'visuals',
-        action: toggleBoardVisuals
+        action: toggleBoardVisuals,
+        public: true
     }],
     ['viewSettingsCmd', {
         name: 'settings',
         description: 'displays the current configuration',
         usage: 'settings',
-        action: displayGuildConfig
+        action: displayGuildConfig,
+        public: true
     }],
     ['resetConfig', {
         name: 'resetconfig',
@@ -57,7 +59,8 @@ const NonGameCommands = new Discord.Collection([
         name: 'help',
         description: 'Display help info for non-game commands, game commands, or both',
         usage: `help <optional ${GameHelpOption}|${NonGameHelpOption}> (no option defaults to all)`,
-        action: displayHelp
+        action: displayHelp,
+        public: true
     }]
 ]);
 
@@ -66,10 +69,7 @@ bot.on('ready', () => {
     
     setupCommands();
     
-    console.log("Servers:");
     bot.guilds.forEach((guild) => {
-        console.log(" - " + guild.name + " - " + guild.id);
-
         const settings = bot.settings.ensure(guild.id, defaultSettings);
         
         if (!settings.game_channel_id) {
@@ -102,6 +102,11 @@ bot.on('message', async message => {
     
     const nonGameCommand = NonGameCommands.find(c => c.name.startsWith(commandName));    
     if (nonGameCommand) {
+        if (!nonGameCommand.public && !message.member.permissions.has('ADMINISTRATOR')) {
+            message.reply(`The ${nonGameCommand.name} command can only be run by administrators`);
+            return;
+        }
+        
         nonGameCommand.action(message, commandArgs);
         return;
     }
@@ -136,8 +141,6 @@ function setupCommands() {
     for(var i = 0; i < Game.Commands.length; i++) {
         bot.commands.set(Game.Commands[i].name, Game.Commands[i]);
     }
-    
-    // NonGameCommands.forEach(c => bot.commands.set(c.name, c));
 }
 
 function setPrefixCharacter(message, prefixArg) {
@@ -197,13 +200,8 @@ function toggleBoardVisuals(message) {
 }
 
 function displayGuildConfig(message) {
-    const guildConfig = bot.settings.ensure(message.guild.id, defaultSettings);
-    
-    const configProps = Object.keys(guildConfig).map(prop => {
-        return `${prop}  :  ${guildConfig[prop]}\n`;
-    });
-    
-    message.reply(`The following are the server's current configuration: ${configProps}`);
+    const configEmbed = createEmbedConfigMessage(message.guild);
+    message.reply(configEmbed);
 }
 
 function resetGuildConfig(message) {
@@ -227,7 +225,7 @@ function displayHelp(message, helpArgs) {
     
     try {   
         const nonGameCmdHelpEmbed = createEmbedHelpMessage(message.guild, true);
-        const gameCmdHelpEmbed = createEmbedHelpMessage(message.guild, false);        
+        const gameCmdHelpEmbed = createEmbedHelpMessage(message.guild, false);
         
         message.reply('A DM has been sent with the help info');
         
@@ -271,6 +269,20 @@ function setCmdChannelByName(guild, channelName) {
     }
     
     return channel;
+}
+
+function createEmbedConfigMessage(guild) {
+    const guildConfig = bot.settings.ensure(guild.id, defaultSettings);
+    
+    const embed = new Discord.RichEmbed()
+        .setTitle(`Configuration for ${guild.name}`)
+        .setTimestamp();
+    
+    Object.keys(guildConfig).map(prop => {
+        embed.addField(prop, guildConfig[prop]);
+    });
+    
+    return embed;
 }
 
 function createEmbedHelpMessage(guild, nonGameCommands) {
