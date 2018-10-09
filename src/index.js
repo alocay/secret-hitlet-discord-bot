@@ -10,6 +10,9 @@ const bot = new Discord.Client();
 let cmdChannel = null;
 let games = new Discord.Collection();
 
+const NonGameHelpOption = 'config';
+const GameHelpOption = 'game'
+
 bot.commands = new Discord.Collection();
 
 bot.settings = new Enmap({
@@ -32,6 +35,12 @@ const NonGameCommands = new Discord.Collection([
         usage: 'setchannel <channel name or ID>',
         action: setCmdChannel
     }],
+    ['toggleBoardVisuals', {
+        name: 'visuals',
+        description: 'toggles the gameboard visuals',
+        usage: 'visuals',
+        action: toggleBoardVisuals
+    }],
     ['viewSettingsCmd', {
         name: 'settings',
         description: 'displays the current configuration',
@@ -46,8 +55,8 @@ const NonGameCommands = new Discord.Collection([
     }],
     ['helpCmd', {
         name: 'help',
-        description: 'Display help info',
-        usage: 'help',
+        description: 'Display help info for non-game commands, game commands, or both',
+        usage: `help <optional ${GameHelpOption}|${NonGameHelpOption}> (no option defaults to all)`,
         action: displayHelp
     }]
 ]);
@@ -63,8 +72,8 @@ bot.on('ready', () => {
 
         const settings = bot.settings.ensure(guild.id, defaultSettings);
         
-        if (!settings.gameCmdChannelId) {
-            setCmdChannelByName(guild, settings.gameCmdChannelName);
+        if (!settings.game_channel_id) {
+            setCmdChannelByName(guild, settings.game_channel_name);
         }
     });
 });
@@ -97,25 +106,25 @@ bot.on('message', async message => {
         return;
     }
     
-    if (!guildConfig.gameCmdChannelId) {
+    if (!guildConfig.game_channel_id) {
         message.reply(`Command channel not setup (or default could not be found). Use ${guildConfig.prefix}setChannel <channel name or ID> to set a channel.`);
         return;
     }
     
-    if(message.channel.id !== guildConfig.gameCmdChannelId) return;
+    if(message.channel.id !== guildConfig.game_channel_id) return;
     
     const command = bot.commands.find(c => c.name.startsWith(commandName));
     if(command && command.action) {
         let game = games.get(guild.id);
             
-        if (!game) {
-            game = new Game(guild, bot.settings.getProp(guild.id, 'gameCmdChannelId'));
-            games.set(guild.id, game);
-        }
-        
         if (commandName === 'play') {
+            if (!game) {
+                game = new Game(guild, bot.settings.ensure(guild.id, defaultSettings));
+                games.set(guild.id, game);
+            }
+            
             game[command.action](commandArgs.join(' '), message);
-        } else {
+        } else if (game) {
             game[command.action](message.author, commandArgs.join(' '));
         }
     } else {
@@ -123,12 +132,12 @@ bot.on('message', async message => {
     }
 });
 
-function setupCommands() {    
+function setupCommands() {
     for(var i = 0; i < Game.Commands.length; i++) {
         bot.commands.set(Game.Commands[i].name, Game.Commands[i]);
     }
     
-    NonGameCommands.forEach(c => bot.commands.set(c.name, c));
+    // NonGameCommands.forEach(c => bot.commands.set(c.name, c));
 }
 
 function setPrefixCharacter(message, prefixArg) {
@@ -148,6 +157,12 @@ function setPrefixCharacter(message, prefixArg) {
 }
 
 function setCmdChannel(message, channelArgsArray) {
+    let game = games.get(message.guild.id);
+    if (game && game.gameRunning) {
+        messaage.reply("A game is currently running and the current game channel can't be changed. Try changing the channel once the game has ended.");
+        return;
+    }
+    
     if (!channelArgsArray || channelArgsArray.length === 0) {
         message.reply('You must provide either a channel name or ID when setting the game text channel for Secret Hitler Bot');
     }
@@ -168,6 +183,19 @@ function setCmdChannel(message, channelArgsArray) {
     message.reply(`Game command channel set to ${channel.name} for Secret Hitler Bot`);
 }
 
+function toggleBoardVisuals(message) {    
+    const settings = bot.settings.ensure(message.guild.id, defaultSettings);    
+    bot.settings.setProp(message.guild.id, 'board_visuals', !settings.board_visuals);
+    
+    let game = games.get(message.guild.id);
+    if (game) {
+        game.toggleFullBoardVisuals();
+    }
+    
+    const msg = settings.board_visuals ? 'Gameboard visuals are now being displayed' : 'Gameboard visuals will no longer be displayed';
+    message.reply(msg);
+}
+
 function displayGuildConfig(message) {
     const guildConfig = bot.settings.ensure(message.guild.id, defaultSettings);
     
@@ -184,14 +212,32 @@ function resetGuildConfig(message) {
     message.reply('The configuration settings have been reset. Use !settings to view the current settings.');
 }
 
-function displayHelp(message) {
+function displayHelp(message, helpArgs) {
     const guildConfig = bot.settings.ensure(message.guild.id, defaultSettings);
+    let displayNonGameHelp = true;
+    let displayGameHelp = true;
     
-    try {
-        let helpDisplay = bot.commands.map(c => `\n${c.name} - ${c.description}\n    Usage: ${guildConfig.prefix}${c.usage}\n`);        
-        helpDisplay.unshift('The following commands are available:\n');
-        helpDisplay.push(`\nNote: The prefix ${hardCodedPrefix} can be used as a back-up if necessary.`);
-        message.reply(helpDisplay.join(''));
+    if (helpArgs.length > 0) {
+        if (helpArgs[0] === NonGameHelpOption) {
+            displayGameHelp = false;
+        } else if (helpArgs[0] === GameHelpOption) {
+            displayNonGameHelp = false;
+        }
+    }
+    
+    try {   
+        const nonGameCmdHelpEmbed = createEmbedHelpMessage(message.guild, true);
+        const gameCmdHelpEmbed = createEmbedHelpMessage(message.guild, false);        
+        
+        message.reply('A DM has been sent with the help info');
+        
+        if (displayNonGameHelp) {
+            message.author.send(nonGameCmdHelpEmbed);
+        }
+        
+        if (displayGameHelp) {
+            message.author.send(gameCmdHelpEmbed);
+        }
     } catch(e) {
         console.error('Error display help', e);
     }
@@ -202,11 +248,11 @@ function setCmdChannelById(guild, channelId) {
     
     if (channel) {
         const settings = bot.settings.ensure(guild.id, defaultSettings);
-        if (settings.gameCmdChannelName !== channel.name) {
-            bot.settings.setProp(guild.id, 'gameCmdChannelName', channel.name);
+        if (settings.game_channel_name !== channel.name) {
+            bot.settings.setProp(guild.id, 'game_channel_name', channel.name);
         }
         
-        bot.settings.setProp(guild.id, 'gameCmdChannelId', channel.id);
+        bot.settings.setProp(guild.id, 'game_channel_id', channel.id);
     }
     
     return channel;
@@ -217,14 +263,37 @@ function setCmdChannelByName(guild, channelName) {
     
     if (channel) {
         const settings = bot.settings.ensure(guild.id, defaultSettings);
-        if (settings.gameCmdChannelName !== channelName) {
-            bot.settings.setProp(guild.id, 'gameCmdChannelName', channelName);
+        if (settings.game_channel_name !== channelName) {
+            bot.settings.setProp(guild.id, 'game_channel_name', channelName);
         }
         
-        bot.settings.setProp(guild.id, 'gameCmdChannelId', channel.id);
+        bot.settings.setProp(guild.id, 'game_channel_id', channel.id);
     }
     
     return channel;
+}
+
+function createEmbedHelpMessage(guild, nonGameCommands) {
+    const guildConfig = bot.settings.ensure(guild.id, defaultSettings);
+    const nonGameNote = '**Note:** All commands can be reduced to at least 2 letters.';
+    const gameNote = '**Note:** All commands can be reduced to at least 2 letters and players can either be identified via a callout @<user> or thier user/nickname (partials are okay).';
+    let description = nonGameCommands ? 
+        `${nonGameNote}\n\nThe following non-game commands are available:` : 
+        `The rules can be found here [Secret Hitler Rules PDF](https://secrethitler.com/assets/Secret_Hitler_Rules.pdf)\n\n${gameNote}\n\nThe following game commands are available:`;
+    
+    const embed = new Discord.RichEmbed()
+        .setTitle('Secret Hitler Bot Help Information')
+        .setDescription(description)
+        .setFooter(`The command prefix ${hardCodedPrefix} will always be available if necessary.`)
+        .setTimestamp();
+    
+    const commands = nonGameCommands ? NonGameCommands : bot.commands;
+    
+    commands.forEach(c => {
+        embed.addField(`${guildConfig.prefix}${c.usage}`, c.description);
+    });
+    
+    return embed;
 }
 
 process.on('unhandledRejection', error => console.error(`Uncaught Promise Rejection:\n${error}`));

@@ -1,8 +1,9 @@
 {
     "defaultSettings": {
         "prefix": "!",
-        "gameCmdChannelName": "game_room",
-        "gameCmdChannelId": null
+        "board_visuals": false,
+        "game_channel_name": "game_room",
+        "game_channel_id": null
     },
     
     "token": "",

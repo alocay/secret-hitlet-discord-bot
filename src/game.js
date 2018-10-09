@@ -51,7 +51,7 @@ const createEmbeddedMessage = function createEmbeddedMessage(message) {
 };
 
 class Game {
-    constructor(guild, gameCmdChannelId) {
+    constructor(guild, settings) {
         this.guild = guild;
         this.gameState = null;
         this.deck = [];
@@ -81,10 +81,11 @@ class Game {
         this.facistsWon = false;
         this.liberalsWon = false;
         this.preEndConfirmState = null;
-        this.gameChannelId = gameCmdChannelId;
+        this.gameChannelId = settings.game_channel_id;
+        this.displayFullBoardVisuals = settings.board_visuals;
         
         if (this.guild) {
-            this.gameChannel = this.guild.channels.get(gameCmdChannelId);
+            this.gameChannel = this.guild.channels.get(settings.game-channel-id);
         } else {
             this.log('Client object not provided - cannot initialize');
         }
@@ -96,6 +97,10 @@ class Game {
 		}
 	}
 	
+    toggleFullBoardVisuals() {
+        this.displayFullBoardVisuals = !this.displayFullBoardVisuals;
+    }
+    
     sendMessageLine(msg) {
         this.sendMessage(msg + '\n');
     }
@@ -138,7 +143,7 @@ class Game {
         const gameBoardElements = this.getVisualGameboardDisplay();
         const gameBoardText = this.gameBoard.getGameboardDisplay();
         
-        if (!gameBoardElements) {
+        if (!this.displayFullBoardVisuals || !gameBoardElements) {
             this.sendMessageLine(gameBoardText);
         } else {
             this.sendGameboardEmbeds(gameBoardElements[0], gameBoardElements[1], gameBoardText);
@@ -944,20 +949,20 @@ class Game {
                 alias: ['start', 'pl'],
                 description: 'Starts a new game',
                 usage: 'play <optional list of players>',
-                example: 'play or !play @Squid#3288, @vagen#5010',
+                example: 'play or !play @Player#1111, player123, ...',
                 action: 'startGame'
             },
             {
                 name: 'nominate',
                 description: 'Nominate a player as chancellor',
                 usage: 'nominate <player>',
-                example: 'nominate @Squid#3288',
+                example: 'nominate @Player#1111 | nominate player123',
                 action: 'nominateChancellor'            
             },
             {
                 name: 'vote',
                 description: 'Votes on the current election',
-                usage: 'vote <ja,nein>',
+                usage: 'vote <ja|nein|yes|no|j|n|y>',
                 action: 'voteOnNomination'            
             },
             {
@@ -977,14 +982,14 @@ class Game {
                 name: 'elect',
                 description: 'Elects a specially elected president (when applicable)',
                 usage: 'elect <player>',
-                example: 'elect @Squid#3288',
+                example: 'elect @Player#1111 | elect player123',
                 action: 'speciallyElectPresident'
             },
             {
                 name: 'shoot',
                 description: 'Shoots the specified player (when applicable)',
                 usage: 'shoot <player>',
-                example: 'shoot @Squid#3288',
+                example: 'shoot @Player#1111 | shoot player123',
                 action: 'shootPlayer'            
             },
             {
@@ -996,7 +1001,7 @@ class Game {
             {
                 name: 'consent',
                 description: 'Consents or denies to a requested veto (when applicable)',
-                usage: 'consent <ja|nein>',
+                usage: 'consent <ja|nein|yes|no|j|n|y>',
                 action: 'consentVetoRequest'            
             },
             {
