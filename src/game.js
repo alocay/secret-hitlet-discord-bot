@@ -9,7 +9,7 @@ import EmbeddedMessage from './message.js';
 const FacistPolicies = 11;
 const LiberalPolicies = 7;
 const MaxPlayers = 10;
-const MinPlayers = 5;
+const MinPlayers = 2;
 
 const FacistLogo = "https://i.imgur.com/njhfcwE.png";
 const LiberalLogo = "https://i.imgur.com/5uBH2Qp.png";
@@ -85,7 +85,7 @@ class Game {
         this.displayFullBoardVisuals = settings.board_visuals;
         
         if (this.guild) {
-            this.gameChannel = this.guild.channels.get(settings.game-channel-id);
+            this.gameChannel = this.guild.channels.get(settings.game_channel_id);
         } else {
             this.log('Client object not provided - cannot initialize');
         }
@@ -128,6 +128,8 @@ class Game {
             this.gameChannel = this.guild.channels.get(this.gameChannelId);
         }
         
+        console.log('Sending facist board', facistBoard);
+        
         // Send them one after the other
         const that = this;
         this.gameChannel.send(facistBoard)
@@ -155,7 +157,7 @@ class Game {
     }
     
     findPlayerByName(name) {
-        return this.players.find(p => p.nickname.toLowerCase().incldues(name.toLowerCase()));
+        return this.players.find(p => p.nickname.toLowerCase().includes(name.toLowerCase()));
     }
     
     findPlayerByArg(playerArg) {
@@ -253,6 +255,8 @@ class Game {
     getVisualGameboardDisplay() {
         const facistBoardVisual = this.gameBoard.getFacistBoardVisual();
         const liberalBoardVisual = this.gameBoard.getLiberalBoardVisual();
+        
+        console.log('facist visual: ' + facistBoardVisual);
         
         const facistBoardEmbed = new Discord.RichEmbed()
             .setColor(12411490)

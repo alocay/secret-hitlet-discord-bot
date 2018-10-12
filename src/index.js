@@ -3,6 +3,7 @@
 import Discord from 'discord.js';
 import Enmap from 'enmap';
 import Game from './game.js';
+import Gameboard from './gameboard.js';
 
 const { defaultSettings, token, cmd_channel, hardCodedPrefix } = require('./config.json');
 const bot = new Discord.Client();
@@ -11,7 +12,7 @@ let cmdChannel = null;
 let games = new Discord.Collection();
 
 const NonGameHelpOption = 'config';
-const GameHelpOption = 'game'
+const GameHelpOption = 'game';
 
 bot.commands = new Discord.Collection();
 
@@ -307,6 +308,36 @@ function createEmbedHelpMessage(guild, nonGameCommands) {
     
     return embed;
 }
+
+/*function showBoardVisual(message, boardArgs) {
+    const facist = boardArgs[0].toLowerCase() === "true";
+    const players = parseInt(boardArgs[1], 10);
+    const cards = parseInt(boardArgs[2], 10);
+    
+    const color = facist ? 12411490 : 6921935;
+    let visual = null;
+    
+    if (facist) {
+        if (players <= 6) {
+            visual = Gameboard.GameboardVisuals.facist5_6[cards];
+        } else if (players <= 9) {
+            visual = Gameboard.GameboardVisuals.facist7_8[cards];
+        } else {
+            visual = Gameboard.GameboardVisuals.facist9_10[cards];
+        }
+    } else {
+        visual = Gameboard.GameboardVisuals.liberal[cards];
+    }
+    
+    console.log(visual);
+    
+    const visualBoard = new Discord.RichEmbed()
+        .setColor(color)
+        .setImage(visual)
+        .setTimestamp();
+        
+    message.reply(visualBoard);
+}*/
 
 process.on('unhandledRejection', error => console.error(`Uncaught Promise Rejection:\n${error}`));
 

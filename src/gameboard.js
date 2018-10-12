@@ -2,28 +2,28 @@
 
 const GameboardVisuals = {
     "facist5_6": [
-        "https://i.imgur.com/7omhO5Jl.png",
-        "https://i.imgur.com/ztIx9Ocl.png",
-        "https://i.imgur.com/17KMpN4l.png",
-        "https://i.imgur.com/agdxUvql.png",
-        "https://i.imgur.com/Ir0yEsp.png",
-        "https://i.imgur.com/HJc4upq.png"
+        "https://i.imgur.com/QQiu8g0.png",
+        "https://i.imgur.com/QMyQPdy.png",
+        "https://i.imgur.com/A1vdGAN.png",
+        "https://i.imgur.com/W3bSvED.png",
+        "https://i.imgur.com/48x5ttA.png",
+        "https://i.imgur.com/7cdNnMR.png"
     ],
     "facist7_8": [
-        "https://i.imgur.com/T0Z3gkwl.png",
-        "https://i.imgur.com/s6stk9el.png",
-        "https://i.imgur.com/0bEt2Dxl.png",
-        "https://i.imgur.com/Y4x1Zfvl.png",
-        "https://i.imgur.com/KwPjqJLl.png",
-        "https://i.imgur.com/ZUqiKTFl.png"
+        "https://i.imgur.com/6yY8r8Y.png",
+        "https://i.imgur.com/7rxbAFf.png",
+        "https://i.imgur.com/EOJguMn.png",
+        "https://i.imgur.com/6SHgFo1.png",
+        "https://i.imgur.com/4XzUc7v.png",
+        "https://i.imgur.com/an0CmtV.png"
     ],
     "facist9_10": [
-        "https://i.imgur.com/NfWbBTm.png",
-        "https://i.imgur.com/4KWbg03.png",
-        "https://i.imgur.com/0vc1Uuv.png",
-        "https://i.imgur.com/ONdxw2A.png",
-        "https://i.imgur.com/G1qWdfB.png",
-        "https://i.imgur.com/FlZTOLp.png"
+        "https://i.imgur.com/9da5EA4.png",
+        "https://i.imgur.com/sURio4b.png",
+        "https://i.imgur.com/CWFmxTC.png",
+        "https://i.imgur.com/HHb5usz.png",
+        "https://i.imgur.com/BaC5MUR.png",
+        "https://i.imgur.com/U1SyFIC.png"
     ],
     "liberal": [
         "https://i.imgur.com/Ve9Epa6.png",
@@ -65,6 +65,7 @@ class Gameboard {
             Gameboard.PresidentialPowers.Execution,
         ];
         
+        this.numOfPlayers = numOfPlayers;
         this.gameboardType = this.getGameboardType(numOfPlayers);
     }
     
@@ -115,11 +116,11 @@ class Gameboard {
     getFacistBoardVisual() {
         if (this.facistPolicies < 0 || this.facistPolicies > 5) return null;
         
-        if (numOfPlayers <= 6) {
+        if (this.numOfPlayers <= 6) {
             return GameboardVisuals.facist5_6[this.facistPolicies];
-        } else if (numOfPlayers <= 8) {
+        } else if (this.numOfPlayers <= 8) {
             return GameboardVisuals.facist7_8[this.facistPolicies];
-        } else if (numOfPlayers <= 10) {
+        } else if (this.numOfPlayers <= 10) {
             return GameboardVisuals.facist9_10[this.facistPolicies];
         }
         
@@ -153,6 +154,42 @@ class Gameboard {
             Execution: 4
         };
     }
+    
+    /*static get GameboardVisuals() {
+        return {
+            "facist5_6": [
+                "https://i.imgur.com/QQiu8g0.png",
+                "https://i.imgur.com/QMyQPdy.png",
+                "https://i.imgur.com/A1vdGAN.png",
+                "https://i.imgur.com/W3bSvED.png",
+                "https://i.imgur.com/48x5ttA.png",
+                "https://i.imgur.com/7cdNnMR.png"
+            ],
+            "facist7_8": [
+                "https://i.imgur.com/6yY8r8Y.png",
+                "https://i.imgur.com/7rxbAFf.png",
+                "https://i.imgur.com/EOJguMn.png",
+                "https://i.imgur.com/6SHgFo1.png",
+                "https://i.imgur.com/4XzUc7v.png",
+                "https://i.imgur.com/an0CmtV.png"
+            ],
+            "facist9_10": [
+                "https://i.imgur.com/9da5EA4.png",
+                "https://i.imgur.com/sURio4b.png",
+                "https://i.imgur.com/CWFmxTC.png",
+                "https://i.imgur.com/HHb5usz.png",
+                "https://i.imgur.com/BaC5MUR.png",
+                "https://i.imgur.com/U1SyFIC.png"
+            ],
+            "liberal": [
+                "https://i.imgur.com/Ve9Epa6.png",
+                "https://i.imgur.com/UqqqgQV.png",
+                "https://i.imgur.com/9jeV1Bp.png",
+                "https://i.imgur.com/H516JHw.png",
+                "https://i.imgur.com/ZBPzI3W.png"
+            ]
+        };
+    }*/
 }
 
 export default Gameboard;
